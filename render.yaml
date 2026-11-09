@@ -8,14 +8,24 @@ services:
     autoDeploy: true
     envVars:
       - key: TAKTAK_ADMIN
-        value: taktak.messenger@gmail.com
-      # Clave del administrador (OBLIGATORIA). Cámbiala por una tuya y guárdala.
+        value: eliecerdepablos@gmail.com,taktak.messenger@gmail.com
+      # Clave del administrador (OBLIGATORIA). Sirve para los dos correos de arriba.
+      # Cámbiala por una tuya y guárdala.
       - key: TAKTAK_ADMIN_CLAVE
         sync: false
       - key: MAX_BANNERS
         value: "20"
       - key: TOPE_POR_HORA
         value: "10"
+      # Correo para la recuperación de cuentas (Gmail).
+      # GMAIL_APP_PASSWORD es una CONTRASEÑA DE APLICACIÓN, no la normal.
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      # Firma los enlaces de recuperación. Si no se pone, se usa TAKTAK_ADMIN_CLAVE.
+      - key: TAKTAK_SECRETO
+        sync: false
       # Para conservar los enlaces entre reinicios, sube a un plan de pago
       # y monta un disco en /var/data, luego define:
       # - key: TAKTAK_DB

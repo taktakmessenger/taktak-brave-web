@@ -87,18 +87,40 @@ El dominio Unstoppable hoy apunta a IPFS (la web estática). Para que los
 Alternativa recomendada: comprar un dominio normal (`.com`, `.app`), apuntar
 con CNAME a Render, y usar el `.brave` solo como marca.
 
-## Aviso
-
-- Legal: no recojas dinero ni prometas premios sin licencia.
-- Al pagar por publicidad, el usuario final debe ver el anuncio por escrito.
-
 ## Usuarios y administrador
 
 - `POST /api/usuarios/registro` — `{correo, clave}` → crea la cuenta (clave mín. 6).
 - `POST /api/usuarios/login` — `{correo, clave}` → valida la cuenta.
+- `POST /api/usuarios/pregunta` — `{correo, clave, pregunta, respuesta}` → guarda la
+  pregunta secreta de esa cuenta (para poder recuperarla después).
 - `POST /api/admin/login` — `{correo, clave}` → **ahora exige la clave**
   (`TAKTAK_ADMIN_CLAVE`). Sin ella responde 401.
 
-La clave del administrador se define en la variable de entorno
-`TAKTAK_ADMIN_CLAVE`. **Si no se define, el panel admin no se puede abrir**
-(así nadie entra solo con el correo).
+Hay **varios administradores**: `TAKTAK_ADMIN` acepta una lista separada por comas
+(p. ej. `eliecerdepablos@gmail.com,taktak.messenger@gmail.com`). Todos usan la misma
+clave `TAKTAK_ADMIN_CLAVE` y luego cada uno la cambia por dentro.
+
+**Si `TAKTAK_ADMIN_CLAVE` no se define, el panel admin no se puede abrir** (así nadie
+entra solo con el correo).
+
+## Recuperación de cuenta
+
+Dos vías, ambas cierran **todas las sesiones** de la cuenta al cambiar la clave:
+
+- `POST /api/recuperar/codigo` — `{correo}` → manda un código de 6 cifras por correo.
+  Vale 15 minutos, un solo uso, 5 intentos, y **3 peticiones por hora**. La respuesta es
+  la misma exista o no el correo (anti-enumeración).
+- `POST /api/recuperar/verificar` — `{correo, codigo}` → devuelve un `token` temporal.
+- `POST /api/recuperar/pregunta` — `{correo}` → devuelve la pregunta secreta.
+- `POST /api/recuperar/responder` — `{correo, respuesta}` → valida y devuelve un `token`.
+  La respuesta se compara sin tildes, sin mayúsculas y sin espacios de sobra.
+- `POST /api/recuperar/cambiar` — `{token, clave}` → pone la clave nueva.
+
+El correo sale por Gmail. Hacen falta `GMAIL_USER` y `GMAIL_APP_PASSWORD` (contraseña de
+**aplicación**, no la normal). Sin configurar, el código se imprime en la consola del
+servidor (no se miente al usuario).
+
+## Aviso
+
+- Legal: no recojas dinero ni prometas premios sin licencia.
+- Al pagar por publicidad, el usuario final debe ver el anuncio por escrito.
