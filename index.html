@@ -443,6 +443,11 @@
             conf.headers['Content-Type'] = 'application/json';
             if (claveAdmin) conf.headers['Authorization'] = 'Bearer ' + claveAdmin;
             const r = await fetch(ruta, conf);
+            // Un backend de verdad responde JSON. Si llega una pagina HTML
+            // (GitHub Pages, IPFS) es que no hay servidor detras: se avisa con
+            // SIN_SERVIDOR para que quien llama use el modo sin servidor.
+            const tipo = r.headers.get('content-type') || '';
+            if (tipo.indexOf('application/json') === -1) throw new Error('SIN_SERVIDOR');
             const datos = await r.json().catch(function () { return {}; });
             if (!r.ok) throw new Error(datos.error || ('Error ' + r.status));
             return datos;
@@ -509,8 +514,12 @@
                     toggleAdminModal();
                     return;
                 } catch (err) {
-                    alert('Acceso denegado: ' + err.message);
-                    return;
+                    if (err.message !== 'SIN_SERVIDOR') {
+                        alert('Acceso denegado: ' + err.message);
+                        return;
+                    }
+                    // No hay servidor detras: se sigue al respaldo de abajo.
+                    servidorActivo = false;
                 }
             }
             // Sin servidor: se valida en el navegador (respaldo).
