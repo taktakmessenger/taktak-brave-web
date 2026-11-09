@@ -293,6 +293,25 @@ def borrar_sesiones_de(correo):
     con.close()
 
 
+def borrar_usuario(correo):
+    """Borra una cuenta de jugador para poder registrarla otra vez (solo admin)."""
+    correo = (correo or "").strip().lower()
+    if not correo:
+        return "Escribe el correo"
+    if correo in admins():
+        return "No se puede borrar una cuenta de administrador"
+    con = _bd()
+    fila = con.execute("SELECT 1 FROM usuarios WHERE correo=?", (correo,)).fetchone()
+    if not fila:
+        con.close()
+        return "Ese correo no está registrado"
+    con.execute("DELETE FROM usuarios WHERE correo=?", (correo,))
+    con.commit()
+    con.close()
+    borrar_sesiones_de(correo)
+    return None
+
+
 def cambiar_clave(correo, clave):
     correo = (correo or "").strip().lower()
     clave = clave or ""
@@ -758,6 +777,13 @@ class Manejador(BaseHTTPRequestHandler):
             return self._guardar_banner(datos)
         if ruta == "/api/admin/borrar":
             return self._borrar_banner(datos)
+        if ruta == "/api/admin/borrar-usuario":
+            if not self._admin():
+                return self._json({"error": "no autorizado"}, 401)
+            error = borrar_usuario(datos.get("correo"))
+            if error:
+                return self._json({"error": error}, 400)
+            return self._json({"ok": True})
         if ruta == "/api/loteria/comprar":
             error = loteria_comprar(datos.get("numero"), datos.get("wallet"))
             if error:
