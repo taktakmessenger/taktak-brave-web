@@ -905,7 +905,10 @@
             if (el) el.value = location.origin + location.pathname + '#registro';
         })();
         pintarUsuario();
-        if (location.hash === '#registro') abrirAcceso();
+        if (location.hash === '#registro') {
+            abrirAcceso();
+            cambiarPestana('registrar');
+        }
         cargarBanners().then(function () {
             cargarLoteria();
             setInterval(pintarCuentaAtras, 1000);
