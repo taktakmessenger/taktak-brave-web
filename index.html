@@ -199,11 +199,14 @@
 
         <!-- PANEL ADMINISTRADOR (Solo visible tras autenticar con correo y clave) -->
         <section id="adminPanel" class="hidden bg-brave-card border border-purple-500/50 p-6 rounded-2xl shadow-2xl mb-8 relative">
-            <div class="flex items-center justify-between mb-4 pb-2 border-b border-brave-border">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-brave-border flex-wrap gap-2">
                 <h2 class="text-lg font-bold text-purple-400 flex items-center gap-2">
                     <i class="fa-solid fa-user-shield"></i> Panel Administrador
                 </h2>
-                <button onclick="logoutAdmin()" class="text-xs text-red-400 hover:underline">Cerrar Sesión Admin</button>
+                <div class="flex items-center gap-3">
+                    <span id="adminQuien" class="text-xs text-gray-400"></span>
+                    <button onclick="logoutAdmin()" class="text-xs text-red-400 hover:underline">Cerrar Sesión Admin</button>
+                </div>
             </div>
 
             <!-- Formulario para agregar nuevo banner de publicidad -->
@@ -400,6 +403,7 @@
         const API = '';
         let servidorActivo = false;
         let claveAdmin = localStorage.getItem('taktak_admin_clave') || '';
+        let adminEmail = localStorage.getItem('taktak_admin_email') || '';
         let banners = [];
         let isAdminLoggedIn = false;
         let currentTargetUrl = "";
@@ -428,12 +432,16 @@
             localStorage.setItem('taktak_banners', JSON.stringify(lista));
         }
 
-        function entrarComoAdmin() {
+        function entrarComoAdmin(correo) {
             isAdminLoggedIn = true;
+            adminEmail = (correo || adminEmail || '').trim().toLowerCase();
+            if (adminEmail) localStorage.setItem('taktak_admin_email', adminEmail);
             localStorage.setItem('taktak_admin_local', '1');
             document.getElementById('adminPanel').classList.remove('hidden');
             document.getElementById('adminBtnText').innerText = 'Admin Activo';
             document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
+            const quien = document.getElementById('adminQuien');
+            if (quien) quien.innerText = adminEmail ? ('Sesión: ' + adminEmail) : '';
             renderAdminBanners();
             cargarTicketsAdmin();
         }
@@ -510,7 +518,7 @@
                     claveAdmin = datos.clave;
                     localStorage.setItem('taktak_admin_clave', claveAdmin);
                     document.getElementById('adminClaveInput').value = '';
-                    entrarComoAdmin();
+                    entrarComoAdmin(email);
                     toggleAdminModal();
                     return;
                 } catch (err) {
@@ -525,7 +533,7 @@
             // Sin servidor: se valida en el navegador (respaldo).
             if (await claveAdminValidaLocal(email, clave)) {
                 document.getElementById('adminClaveInput').value = '';
-                entrarComoAdmin();
+                entrarComoAdmin(email);
                 toggleAdminModal();
             } else {
                 alert('Acceso denegado: correo o clave incorrectos.');
@@ -535,11 +543,15 @@
         function logoutAdmin() {
             isAdminLoggedIn = false;
             claveAdmin = '';
+            adminEmail = '';
             localStorage.removeItem('taktak_admin_clave');
+            localStorage.removeItem('taktak_admin_email');
             localStorage.removeItem('taktak_admin_local');
             document.getElementById('adminPanel').classList.add('hidden');
             document.getElementById('adminBtnText').innerText = 'Acceso Admin';
             document.getElementById('adminAuthBtn').classList.remove('bg-purple-600', 'text-white');
+            const quien = document.getElementById('adminQuien');
+            if (quien) quien.innerText = '';
         }
 
         // ---------------- USUARIOS (registro y entrada con correo) ----------------
