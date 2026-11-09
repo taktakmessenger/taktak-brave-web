@@ -40,7 +40,10 @@
                 </div>
             </div>
 
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2">
+                <button id="userAuthBtn" onclick="abrirAcceso()" class="px-3 py-1.5 rounded-lg border border-brave-orange/40 text-brave-orange hover:bg-brave-orange/10 text-xs font-semibold flex items-center gap-2 transition">
+                    <i class="fa-solid fa-right-to-bracket"></i> <span id="userBtnText">Entrar / Registrarse</span>
+                </button>
                 <button id="adminAuthBtn" onclick="toggleAdminModal()" class="px-3 py-1.5 rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 text-xs font-semibold flex items-center gap-2 transition">
                     <i class="fa-solid fa-lock"></i> <span id="adminBtnText">Acceso Admin</span>
                 </button>
@@ -150,11 +153,50 @@
             </div>
         </section>
 
-        <!-- PANEL ADMINISTRADOR (Solo visible al autenticar como taktak.messenger@gmail.com) -->
+        <!-- REGISTRO PÚBLICO: comparte este enlace con tu gente -->
+        <section id="registro" class="bg-gradient-to-br from-brave-card via-purple-950/30 to-brave-card border border-brave-orange/40 p-6 rounded-2xl shadow-2xl mb-8 relative overflow-hidden">
+            <div class="absolute -left-6 -bottom-6 bg-purple-600/10 w-28 h-28 rounded-full blur-2xl"></div>
+            <h2 class="text-lg font-bold mb-1 text-gray-100"><i class="fa-solid fa-user-plus text-brave-orange mr-2"></i>Regístrate en TakTak.brave</h2>
+            <p class="text-xs text-gray-400 mb-4">Crea tu cuenta gratis con tu correo para guardar tus enlaces y participar en la lotería.</p>
+
+            <!-- Enlace para compartir -->
+            <div class="mb-4 p-3 bg-brave-dark/70 border border-brave-border rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-1">🔗 Comparte este enlace para que se registren</p>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="linkRegistro" readonly class="bg-transparent font-mono text-brave-orange text-xs w-full focus:outline-none">
+                    <button onclick="copiarRegistro()" class="px-3 py-1.5 bg-brave-border hover:bg-gray-700 text-xs rounded-lg font-semibold whitespace-nowrap">
+                        <i class="fa-solid fa-copy"></i> Copiar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Formulario de registro -->
+            <form onsubmit="handleRegistro(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1 font-medium">Tu correo electrónico</label>
+                    <input type="email" id="regEmail" required autocomplete="email" placeholder="tucorreo@ejemplo.com" class="w-full bg-brave-dark border border-brave-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1 font-medium">Crea una clave</label>
+                    <input type="password" id="regClave" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" class="w-full bg-brave-dark border border-brave-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 hover:opacity-90 text-white font-extrabold py-3 rounded-xl text-sm shadow-lg transition">
+                    Crear mi cuenta
+                </button>
+            </form>
+
+            <!-- Zona de sesión (cuando ya entró) -->
+            <div id="zonaUsuario" class="hidden mt-4 pt-4 border-t border-brave-border text-center">
+                <p class="text-sm text-gray-300">Sesión iniciada como <b id="usuarioLogueado" class="text-brave-orange"></b></p>
+                <button onclick="cerrarSesion()" class="mt-2 text-xs text-red-400 hover:underline">Cerrar sesión</button>
+            </div>
+        </section>
+
+        <!-- PANEL ADMINISTRADOR (Solo visible tras autenticar con correo y clave) -->
         <section id="adminPanel" class="hidden bg-brave-card border border-purple-500/50 p-6 rounded-2xl shadow-2xl mb-8 relative">
             <div class="flex items-center justify-between mb-4 pb-2 border-b border-brave-border">
                 <h2 class="text-lg font-bold text-purple-400 flex items-center gap-2">
-                    <i class="fa-solid fa-user-shield"></i> Panel Administrador (<span class="text-xs text-white">taktak.messenger@gmail.com</span>)
+                    <i class="fa-solid fa-user-shield"></i> Panel Administrador
                 </h2>
                 <button onclick="logoutAdmin()" class="text-xs text-red-400 hover:underline">Cerrar Sesión Admin</button>
             </div>
@@ -211,16 +253,57 @@
     <div id="adminModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-brave-card border border-purple-500/50 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative">
             <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2"><i class="fa-solid fa-lock text-purple-400"></i> Acceso Administrador</h3>
-            <p class="text-xs text-gray-400 mb-4">Introduce la cuenta administradora autorizada para gestionar la publicidad.</p>
+            <p class="text-xs text-gray-400 mb-4">Solo el administrador autorizado. Hacen falta el correo y la clave.</p>
             <form onsubmit="handleAdminLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">Correo Electrónico</label>
-                    <input type="email" id="adminEmailInput" required placeholder="taktak.messenger@gmail.com" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+                    <input type="email" id="adminEmailInput" required autocomplete="username" placeholder="Correo del administrador" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Clave</label>
+                    <input type="password" id="adminClaveInput" required autocomplete="current-password" placeholder="Clave de administrador" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
                 </div>
                 <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
                     Verificar y Entrar
                 </button>
                 <button type="button" onclick="toggleAdminModal()" class="w-full text-center text-xs text-gray-400 hover:underline">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ENTRAR / REGISTRARSE (usuarios) -->
+    <div id="accesoModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-brave-card border border-brave-orange/50 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="cerrarAcceso()" class="absolute top-3 right-3 text-gray-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <div class="flex gap-2 mb-4 bg-brave-dark p-1 rounded-xl">
+                <button id="tabEntrar" onclick="cambiarPestana('entrar')" class="flex-1 py-2 rounded-lg text-xs font-bold transition">Entrar</button>
+                <button id="tabRegistrar" onclick="cambiarPestana('registrar')" class="flex-1 py-2 rounded-lg text-xs font-bold transition">Registrarse</button>
+            </div>
+
+            <!-- Formulario: entrar -->
+            <form id="formEntrar" onsubmit="handleEntrar(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Correo Electrónico</label>
+                    <input type="email" id="entrarEmail" required autocomplete="email" placeholder="tucorreo@ejemplo.com" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Clave</label>
+                    <input type="password" id="entrarClave" required autocomplete="current-password" placeholder="Tu clave" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Entrar</button>
+            </form>
+
+            <!-- Formulario: registrarse -->
+            <form id="formRegistrar" onsubmit="handleRegistroModal(event)" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Correo Electrónico</label>
+                    <input type="email" id="modalRegEmail" required autocomplete="email" placeholder="tucorreo@ejemplo.com" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Crea una clave</label>
+                    <input type="password" id="modalRegClave" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Crear mi cuenta</button>
             </form>
         </div>
     </div>
@@ -324,10 +407,11 @@
         async function handleAdminLogin(e) {
             e.preventDefault();
             const email = document.getElementById('adminEmailInput').value.trim();
+            const clave = document.getElementById('adminClaveInput').value;
             try {
                 const datos = await api(API + '/api/admin/login', {
                     method: 'POST',
-                    body: JSON.stringify({ correo: email })
+                    body: JSON.stringify({ correo: email, clave: clave })
                 });
                 claveAdmin = datos.clave;
                 localStorage.setItem('taktak_admin_clave', claveAdmin);
@@ -336,6 +420,7 @@
                 document.getElementById('adminBtnText').innerText = 'Admin Activo';
                 document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
                 toggleAdminModal();
+                document.getElementById('adminClaveInput').value = '';
                 renderAdminBanners();
                 cargarTicketsAdmin();
             } catch (err) {
@@ -350,6 +435,143 @@
             document.getElementById('adminPanel').classList.add('hidden');
             document.getElementById('adminBtnText').innerText = 'Acceso Admin';
             document.getElementById('adminAuthBtn').classList.remove('bg-purple-600', 'text-white');
+        }
+
+        // ---------------- USUARIOS (registro y entrada con correo) ----------------
+        let usuarioActual = localStorage.getItem('taktak_usuario') || '';
+
+        function pintarUsuario() {
+            const zona = document.getElementById('zonaUsuario');
+            const btnTxt = document.getElementById('userBtnText');
+            if (usuarioActual) {
+                if (zona) {
+                    zona.classList.remove('hidden');
+                    document.getElementById('usuarioLogueado').innerText = usuarioActual;
+                }
+                if (btnTxt) btnTxt.innerText = usuarioActual.split('@')[0];
+            } else {
+                if (zona) zona.classList.add('hidden');
+                if (btnTxt) btnTxt.innerText = 'Entrar / Registrarse';
+            }
+        }
+
+        function abrirAcceso() {
+            document.getElementById('accesoModal').classList.remove('hidden');
+            cambiarPestana('entrar');
+        }
+        function cerrarAcceso() {
+            document.getElementById('accesoModal').classList.add('hidden');
+        }
+        function cambiarPestana(cual) {
+            const entrar = document.getElementById('formEntrar');
+            const registrar = document.getElementById('formRegistrar');
+            const tabE = document.getElementById('tabEntrar');
+            const tabR = document.getElementById('tabRegistrar');
+            const activo = 'flex-1 py-2 rounded-lg text-xs font-bold transition bg-brave-orange text-white';
+            const inactivo = 'flex-1 py-2 rounded-lg text-xs font-bold transition text-gray-400';
+            if (cual === 'registrar') {
+                entrar.classList.add('hidden'); registrar.classList.remove('hidden');
+                tabR.className = activo; tabE.className = inactivo;
+            } else {
+                registrar.classList.add('hidden'); entrar.classList.remove('hidden');
+                tabE.className = activo; tabR.className = inactivo;
+            }
+        }
+
+        async function registrarUsuario(email, clave) {
+            if (servidorActivo) {
+                const datos = await api(API + '/api/usuarios/registro', {
+                    method: 'POST',
+                    body: JSON.stringify({ correo: email, clave: clave })
+                });
+                usuarioActual = datos.correo || email;
+            } else {
+                // Sin servidor: se guarda localmente (demostración)
+                let usuarios = {};
+                try { usuarios = JSON.parse(localStorage.getItem('taktak_usuarios') || '{}'); } catch (e) { usuarios = {}; }
+                if (usuarios[email]) throw new Error('Ese correo ya está registrado.');
+                usuarios[email] = clave;
+                localStorage.setItem('taktak_usuarios', JSON.stringify(usuarios));
+                usuarioActual = email;
+            }
+            localStorage.setItem('taktak_usuario', usuarioActual);
+            pintarUsuario();
+        }
+
+        async function entrarUsuario(email, clave) {
+            if (servidorActivo) {
+                const datos = await api(API + '/api/usuarios/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ correo: email, clave: clave })
+                });
+                usuarioActual = datos.correo || email;
+            } else {
+                let usuarios = {};
+                try { usuarios = JSON.parse(localStorage.getItem('taktak_usuarios') || '{}'); } catch (e) { usuarios = {}; }
+                if (usuarios[email] !== clave) throw new Error('Correo o clave incorrectos.');
+                usuarioActual = email;
+            }
+            localStorage.setItem('taktak_usuario', usuarioActual);
+            pintarUsuario();
+        }
+
+        function cerrarSesion() {
+            usuarioActual = '';
+            localStorage.removeItem('taktak_usuario');
+            pintarUsuario();
+        }
+
+        // Registro desde la sección pública (con enlace compartible)
+        async function handleRegistro(e) {
+            e.preventDefault();
+            const email = document.getElementById('regEmail').value.trim().toLowerCase();
+            const clave = document.getElementById('regClave').value;
+            if (clave.length < 6) { alert('La clave debe tener al menos 6 caracteres.'); return; }
+            try {
+                await registrarUsuario(email, clave);
+                document.getElementById('regClave').value = '';
+                alert('¡Cuenta creada! Ya puedes usar TakTak.brave con tu correo.');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Registro desde el modal
+        async function handleRegistroModal(e) {
+            e.preventDefault();
+            const email = document.getElementById('modalRegEmail').value.trim().toLowerCase();
+            const clave = document.getElementById('modalRegClave').value;
+            if (clave.length < 6) { alert('La clave debe tener al menos 6 caracteres.'); return; }
+            try {
+                await registrarUsuario(email, clave);
+                document.getElementById('modalRegClave').value = '';
+                cerrarAcceso();
+                alert('¡Cuenta creada! Bienvenido a TakTak.brave.');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Entrada desde el modal
+        async function handleEntrar(e) {
+            e.preventDefault();
+            const email = document.getElementById('entrarEmail').value.trim().toLowerCase();
+            const clave = document.getElementById('entrarClave').value;
+            try {
+                await entrarUsuario(email, clave);
+                document.getElementById('entrarClave').value = '';
+                cerrarAcceso();
+                alert('¡Hola de nuevo!');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function copiarRegistro() {
+            const input = document.getElementById('linkRegistro');
+            input.select();
+            try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+            alert('Enlace copiado. Compártelo con tu gente.');
         }
 
         async function handleAddBanner(e) {
@@ -678,6 +900,12 @@
         }
 
         // Arranque: cargar banners y, si había sesión de admin, reabrir el panel
+        (function initEnlaceRegistro() {
+            const el = document.getElementById('linkRegistro');
+            if (el) el.value = location.origin + location.pathname + '#registro';
+        })();
+        pintarUsuario();
+        if (location.hash === '#registro') abrirAcceso();
         cargarBanners().then(function () {
             cargarLoteria();
             setInterval(pintarCuentaAtras, 1000);

@@ -9,6 +9,9 @@ services:
     envVars:
       - key: TAKTAK_ADMIN
         value: taktak.messenger@gmail.com
+      # Clave del administrador (OBLIGATORIA). Cámbiala por una tuya y guárdala.
+      - key: TAKTAK_ADMIN_CLAVE
+        sync: false
       - key: MAX_BANNERS
         value: "20"
       - key: TOPE_POR_HORA

@@ -7,6 +7,7 @@ Variables de entorno:
     PUERTO / PORT   puerto (por defecto 8080)
     TAKTAK_DB       ruta del fichero SQLite
     TAKTAK_ADMIN    correo del administrador
+    TAKTAK_ADMIN_CLAVE  clave del administrador (obligatoria para entrar)
     MAX_BANNERS     maximo de banners (20)
     MAX_DIAS        dias de conservacion de enlaces (365)
     TOPE_POR_HORA   enlaces por IP y hora (10)
@@ -14,6 +15,7 @@ Variables de entorno:
     LOTERIA_PRECIO  precio del ticket en BAT (demo, 1.0)
     LOTERIA_BASE    pozo base en BAT (demo, 5.0)
 """
+import hashlib
 import json
 import os
 import random
@@ -97,6 +99,12 @@ def preparar_bd():
             wallet TEXT NOT NULL,
             creado INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS usuarios (
+            correo  TEXT PRIMARY KEY,
+            sal     TEXT NOT NULL,
+            clave   TEXT NOT NULL,
+            creado  INTEGER NOT NULL
+        );
         """
     )
     con.commit()
@@ -152,6 +160,49 @@ def permitido(ip):
         marcas.append(ahora)
         CONTADOR[ip] = marcas
         return True
+
+
+# --------------------------------------------------------------------------- #
+# Claves (hash con sal, sin dependencias)
+# --------------------------------------------------------------------------- #
+def _hash_clave(clave, sal):
+    return hashlib.pbkdf2_hmac("sha256", clave.encode("utf-8"), bytes.fromhex(sal), 120_000).hex()
+
+
+def clave_valida(correo, clave):
+    """Comprueba correo+clave. El admin se valida con TAKTAK_ADMIN_CLAVE."""
+    correo = (correo or "").strip().lower()
+    clave = clave or ""
+    admin = (os.environ.get("TAKTAK_ADMIN") or "taktak.messenger@gmail.com").lower()
+    if correo == admin:
+        esperada = os.environ.get("TAKTAK_ADMIN_CLAVE") or ""
+        return bool(esperada) and secrets.compare_digest(clave, esperada)
+    con = _bd()
+    fila = con.execute("SELECT sal, clave FROM usuarios WHERE correo=?", (correo,)).fetchone()
+    con.close()
+    if not fila:
+        return False
+    return secrets.compare_digest(_hash_clave(clave, fila["sal"]), fila["clave"])
+
+
+def crear_usuario(correo, clave):
+    correo = (correo or "").strip().lower()
+    clave = clave or ""
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", correo):
+        return "Escribe un correo válido"
+    if len(clave) < 6:
+        return "La clave debe tener al menos 6 caracteres"
+    sal = secrets.token_hex(16)
+    con = _bd()
+    existe = con.execute("SELECT 1 FROM usuarios WHERE correo=?", (correo,)).fetchone()
+    if existe:
+        con.close()
+        return "Ese correo ya está registrado"
+    con.execute("INSERT INTO usuarios (correo, sal, clave, creado) VALUES (?,?,?,?)",
+                (correo, sal, _hash_clave(clave, sal), int(time.time())))
+    con.commit()
+    con.close()
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -443,6 +494,16 @@ class Manejador(BaseHTTPRequestHandler):
             return self._visita(datos)
         if ruta == "/api/admin/login":
             return self._login(datos)
+        if ruta == "/api/usuarios/registro":
+            error = crear_usuario(datos.get("correo"), datos.get("clave"))
+            if error:
+                return self._json({"error": error}, 400)
+            return self._json({"ok": True, "correo": (datos.get("correo") or "").strip().lower()})
+        if ruta == "/api/usuarios/login":
+            correo = (datos.get("correo") or "").strip().lower()
+            if not clave_valida(correo, datos.get("clave")):
+                return self._json({"error": "correo o clave incorrectos"}, 401)
+            return self._json({"ok": True, "correo": correo})
         if ruta == "/api/admin/banners":
             return self._guardar_banner(datos)
         if ruta == "/api/admin/borrar":
@@ -534,16 +595,17 @@ class Manejador(BaseHTTPRequestHandler):
 
     def _login(self, datos):
         correo = (datos.get("correo") or "").strip().lower()
+        clave = datos.get("clave") or ""
         admin = (os.environ.get("TAKTAK_ADMIN") or "taktak.messenger@gmail.com").lower()
-        if correo != admin:
-            return self._json({"error": "correo no autorizado"}, 401)
-        clave = secrets.token_urlsafe(24)
+        if correo != admin or not clave_valida(correo, clave):
+            return self._json({"error": "correo o clave incorrectos"}, 401)
+        clave_sesion = secrets.token_urlsafe(24)
         con = _bd()
         con.execute("INSERT INTO sesiones (clave, correo, creado) VALUES (?,?,?)",
-                    (clave, correo, int(time.time())))
+                    (clave_sesion, correo, int(time.time())))
         con.commit()
         con.close()
-        return self._json({"clave": clave})
+        return self._json({"clave": clave_sesion})
 
     def _guardar_banner(self, datos):
         if not self._admin():

@@ -91,3 +91,14 @@ con CNAME a Render, y usar el `.brave` solo como marca.
 
 - Legal: no recojas dinero ni prometas premios sin licencia.
 - Al pagar por publicidad, el usuario final debe ver el anuncio por escrito.
+
+## Usuarios y administrador
+
+- `POST /api/usuarios/registro` — `{correo, clave}` → crea la cuenta (clave mín. 6).
+- `POST /api/usuarios/login` — `{correo, clave}` → valida la cuenta.
+- `POST /api/admin/login` — `{correo, clave}` → **ahora exige la clave**
+  (`TAKTAK_ADMIN_CLAVE`). Sin ella responde 401.
+
+La clave del administrador se define en la variable de entorno
+`TAKTAK_ADMIN_CLAVE`. **Si no se define, el panel admin no se puede abrir**
+(así nadie entra solo con el correo).
