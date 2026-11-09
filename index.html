@@ -490,7 +490,38 @@
         }
 
         // ---------------- LOTERÍA (DEMOSTRACIÓN) ----------------
+        // Con servidor: el pozo y los tickets se comparten entre todos.
+        // Sin servidor (copia estática publicada): respaldo en localStorage,
+        // así cualquiera que pase por la web puede probar la lotería.
         let lotEstado = null;
+
+        function hoyISO() { return new Date().toISOString().slice(0, 10); }
+        function proximaMedianoche() {
+            const d = new Date();
+            d.setHours(24, 0, 0, 0);
+            return Math.floor(d.getTime() / 1000);
+        }
+
+        function loteriaLocalLeer() {
+            let d = {};
+            try { d = JSON.parse(localStorage.getItem('taktak_loteria') || '{}'); } catch (e) { d = {}; }
+            if (d.fecha !== hoyISO()) d = { fecha: hoyISO(), tickets: [], ganador: null };
+            if (!Array.isArray(d.tickets)) d.tickets = [];
+            return d;
+        }
+        function loteriaLocalGuardar(d) { localStorage.setItem('taktak_loteria', JSON.stringify(d)); }
+
+        function estadoLocal() {
+            const d = loteriaLocalLeer();
+            return {
+                fecha: d.fecha, precio: 1,
+                pozo: +(5 + d.tickets.length * 0.8).toFixed(2),
+                admin: +(d.tickets.length * 0.2).toFixed(2),
+                tickets: d.tickets.length, pozo_pct: 80, admin_pct: 20,
+                proximo: proximaMedianoche(), sorteado: !!d.ganador,
+                ganador: d.ganador, demo: true
+            };
+        }
 
         function pintarCuentaAtras() {
             const el = document.getElementById('lotCountdown');
@@ -523,6 +554,13 @@
         }
 
         async function cargarLoteria() {
+            if (!servidorActivo) {
+                lotEstado = estadoLocal();
+                renderLoteria();
+                if (userAddress) cargarMisTickets();
+                if (isAdminLoggedIn) cargarTicketsAdmin();
+                return;
+            }
             try {
                 lotEstado = await api(API + '/api/loteria');
                 renderLoteria();
@@ -533,75 +571,110 @@
 
         async function cargarMisTickets() {
             const caja = document.getElementById('lotMisTickets');
-            if (!caja || !userAddress || !servidorActivo) return;
-            try {
-                const d = await api(API + '/api/loteria/tickets?wallet=' + encodeURIComponent(userAddress));
-                const mios = d.tickets || [];
-                if (!mios.length) {
-                    caja.innerHTML = '<span class="text-gray-600 text-[11px] italic">No has comprado tickets aún.</span>';
-                    return;
-                }
-                caja.innerHTML = mios.map(function (t) {
-                    return '<span class="bg-brave-orange/20 border border-brave-orange/40 text-orange-300 font-mono font-bold px-2 py-1 rounded-lg">#' + t.numero + '</span>';
-                }).join('');
-            } catch (e) { /* ignore */ }
+            if (!caja || !userAddress) return;
+            let mios = [];
+            if (servidorActivo) {
+                try {
+                    const d = await api(API + '/api/loteria/tickets?wallet=' + encodeURIComponent(userAddress));
+                    mios = d.tickets || [];
+                } catch (e) { /* ignore */ }
+            } else {
+                mios = loteriaLocalLeer().tickets.filter(function (t) { return t.wallet === userAddress; });
+            }
+            if (!mios.length) {
+                caja.innerHTML = '<span class="text-gray-600 text-[11px] italic">No has comprado tickets aún.</span>';
+                return;
+            }
+            caja.innerHTML = mios.map(function (t) {
+                return '<span class="bg-brave-orange/20 border border-brave-orange/40 text-orange-300 font-mono font-bold px-2 py-1 rounded-lg">#' + t.numero + '</span>';
+            }).join('');
         }
 
         async function cargarTicketsAdmin() {
             const caja = document.getElementById('adminTicketsRegistry');
             if (!caja) return;
-            try {
-                const d = await api(API + '/api/loteria/tickets');
-                const lista = d.tickets || [];
-                if (!lista.length) {
-                    caja.innerHTML = '<p class="text-gray-600 italic">Esperando primeras compras...</p>';
-                    return;
-                }
-                caja.innerHTML = lista.map(function (t) {
-                    return '<div class="border-b border-brave-border pb-1 flex justify-between gap-2"><span>' +
-                        t.wallet + '</span><span class="text-brave-orange font-bold">#' + t.numero +
-                        '</span><span class="text-gray-600">' + t.hora + '</span></div>';
-                }).join('');
-            } catch (e) { /* ignore */ }
+            let lista = [];
+            if (servidorActivo) {
+                try {
+                    const d = await api(API + '/api/loteria/tickets');
+                    lista = d.tickets || [];
+                } catch (e) { /* ignore */ }
+            } else {
+                lista = loteriaLocalLeer().tickets.map(function (t) {
+                    return { numero: t.numero, hora: t.hora,
+                             wallet: t.wallet.slice(0, 6) + '...' + t.wallet.slice(-4) };
+                });
+            }
+            if (!lista.length) {
+                caja.innerHTML = '<p class="text-gray-600 italic">Esperando primeras compras...</p>';
+                return;
+            }
+            caja.innerHTML = lista.map(function (t) {
+                return '<div class="border-b border-brave-border pb-1 flex justify-between gap-2"><span>' +
+                    t.wallet + '</span><span class="text-brave-orange font-bold">#' + t.numero +
+                    '</span><span class="text-gray-600">' + t.hora + '</span></div>';
+            }).join('');
         }
 
         async function comprarTicket() {
-            if (!servidorActivo) {
-                alert('Esta copia no está conectada al servidor.');
-                return;
-            }
             if (!userAddress) { await connectWallet(); if (!userAddress) return; }
             const num = (document.getElementById('lotNumero').value || '').replace(/\D/g, '');
             if (num.length !== 4) {
                 alert('Escribe un número de 4 dígitos (0000-9999).');
                 return;
             }
-            try {
-                lotEstado = await api(API + '/api/loteria/comprar', {
-                    method: 'POST',
-                    body: JSON.stringify({ numero: num, wallet: userAddress })
-                });
-                renderLoteria();
-                cargarMisTickets();
-                document.getElementById('lotNumero').value = '';
-                alert('¡Ticket #' + num + ' registrado!\n\n(Demostración: no se cobró ningún token.)');
-            } catch (e) {
-                alert(e.message);
+            if (servidorActivo) {
+                try {
+                    lotEstado = await api(API + '/api/loteria/comprar', {
+                        method: 'POST',
+                        body: JSON.stringify({ numero: num, wallet: userAddress })
+                    });
+                    renderLoteria();
+                    cargarMisTickets();
+                    document.getElementById('lotNumero').value = '';
+                    alert('¡Ticket #' + num + ' registrado!\n\n(Demostración: no se cobró ningún token.)');
+                } catch (e) {
+                    alert(e.message);
+                }
+                return;
             }
+            const d = loteriaLocalLeer();
+            if (d.ganador) { alert('El sorteo de hoy ya se realizó. Vuelve mañana.'); return; }
+            d.tickets.push({ numero: num, wallet: userAddress,
+                             hora: new Date().toLocaleTimeString('es-VE', { hour12: false }) });
+            loteriaLocalGuardar(d);
+            lotEstado = estadoLocal();
+            renderLoteria();
+            cargarMisTickets();
+            if (isAdminLoggedIn) cargarTicketsAdmin();
+            document.getElementById('lotNumero').value = '';
+            alert('¡Ticket #' + num + ' registrado!\n\n(Demostración: no se cobró ningún token.)');
         }
 
         async function sortearLoteria() {
-            try {
-                lotEstado = await api(API + '/api/loteria/sortear', { method: 'POST', body: '{}' });
-                renderLoteria();
-                cargarTicketsAdmin();
-                if (lotEstado.ganador) {
-                    alert('🎉 Ganador de hoy: #' + lotEstado.ganador.numero + ' (' +
-                        lotEstado.ganador.wallet + ')\n\nRecordatorio: es una demostración; todavía no se paga ningún premio.');
+            if (servidorActivo) {
+                try {
+                    lotEstado = await api(API + '/api/loteria/sortear', { method: 'POST', body: '{}' });
+                    renderLoteria();
+                    cargarTicketsAdmin();
+                    if (lotEstado.ganador) {
+                        alert('🎉 Ganador de hoy: #' + lotEstado.ganador.numero + ' (' +
+                            lotEstado.ganador.wallet + ')\n\nRecordatorio: es una demostración; todavía no se paga ningún premio.');
+                    }
+                } catch (e) {
+                    alert(e.message);
                 }
-            } catch (e) {
-                alert(e.message);
+                return;
             }
+            const d = loteriaLocalLeer();
+            if (!d.tickets.length) { alert('No hay tickets vendidos hoy.'); return; }
+            if (!d.ganador) d.ganador = d.tickets[Math.floor(Math.random() * d.tickets.length)];
+            loteriaLocalGuardar(d);
+            lotEstado = estadoLocal();
+            renderLoteria();
+            cargarTicketsAdmin();
+            alert('🎉 Ganador de hoy: #' + d.ganador.numero + ' (' + d.ganador.wallet +
+                ')\n\nRecordatorio: es una demostración; todavía no se paga ningún premio.');
         }
 
         // Arranque: cargar banners y, si había sesión de admin, reabrir el panel
