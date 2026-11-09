@@ -1,0 +1,5 @@
+servidor/taktak.db
+servidor/*.db
+__pycache__/
+*.pyc
+.openhands/

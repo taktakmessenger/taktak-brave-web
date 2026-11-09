@@ -74,10 +74,11 @@
                     <button onclick="copyLink()" class="px-3 py-1.5 bg-brave-border hover:bg-gray-700 text-xs rounded-lg font-semibold flex items-center gap-1">
                         <i class="fa-solid fa-copy"></i> Copiar
                     </button>
-                    <button onclick="simulateRedirect()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-xs rounded-lg font-semibold text-white flex items-center gap-1">
-                        <i class="fa-solid fa-play"></i> Probar
+                    <button onclick="abrirEnlace()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-xs rounded-lg font-semibold text-white flex items-center gap-1">
+                        <i class="fa-solid fa-play"></i> Abrir
                     </button>
                 </div>
+                <p id="estadoServidor" class="text-[10px] text-gray-500 mt-2">Conectando con el servidor...</p>
             </div>
         </section>
 
@@ -99,19 +100,11 @@
                         <input type="text" id="adTitle" required placeholder="Ej: DeFi Staking Pro" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
                     </div>
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">Patrocinador / Marca</label>
-                        <input type="text" id="adSponsor" required placeholder="Ej: Brave Ads Network" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">Descripción Corta</label>
-                    <input type="text" id="adDesc" required placeholder="Ej: Obten 12% APY staking tus BAT tokens sin comisiones." class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
                         <label class="block text-xs text-gray-400 mb-1">URL de Imagen/Banner (HTTPS)</label>
                         <input type="url" id="adImageUrl" required placeholder="https://images.unsplash.com/photo-xxx..." class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
                     </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs text-gray-400 mb-1">URL del Enlace de Destino del Anuncio</label>
                         <input type="url" id="adTargetUrl" required placeholder="https://brave.com/rewards" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
@@ -179,119 +172,153 @@
     </div>
 
     <script>
-        // Configuración por defecto de Banners
-        const DEFAULT_BANNERS = [
-            {
-                id: 1,
-                title: "Brave Rewards & BAT Staking",
-                sponsor: "Brave Ecosystem",
-                desc: "Gana tokens BAT por navegar con privacidad y accede a beneficios exclusivos.",
-                imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&auto=format&fit=crop&q=60",
-                targetUrl: "https://brave.com/rewards"
-            }
-        ];
-
-        // Estado Global
-        let banners;
-        try {
-            const saved = JSON.parse(localStorage.getItem('taktak_banners'));
-            banners = Array.isArray(saved) && saved.length ? saved : DEFAULT_BANNERS;
-        } catch {
-            banners = DEFAULT_BANNERS;
-        }
+        // ----------------------------------------------------------------
+        // Conexion con el servidor (API real).
+        // Si la web se abre sin servidor (por ejemplo en IPFS), avisa y no
+        // genera enlaces falsos.
+        // ----------------------------------------------------------------
+        const API = '';
+        let servidorActivo = false;
+        let claveAdmin = localStorage.getItem('taktak_admin_clave') || '';
+        let banners = [];
         let isAdminLoggedIn = false;
         let currentTargetUrl = "";
         let countdownTimer = null;
 
-        // Cargar Banners al Iniciar
-        function renderAdminBanners() {
-            const container = document.getElementById('bannersList');
-            container.innerHTML = '';
-
-            banners.forEach((ad, index) => {
-                const item = document.createElement('div');
-                item.className = "flex items-center justify-between p-3 bg-brave-dark border border-brave-border rounded-xl text-xs";
-                item.innerHTML = `
-                    <div class="flex items-center space-x-3">
-                        <img src="${ad.imageUrl}" class="w-12 h-12 object-cover rounded-lg">
-                        <div>
-                            <h4 class="font-bold text-white">${ad.title} <span class="text-[10px] text-gray-400">(${ad.sponsor})</span></h4>
-                            <p class="text-gray-400 text-[11px]">${ad.desc}</p>
-                        </div>
-                    </div>
-                    <button onclick="deleteBanner(${index})" class="text-red-400 hover:text-red-300 px-2 py-1"><i class="fa-solid fa-trash"></i></button>
-                `;
-                container.appendChild(item);
-            });
-            localStorage.setItem('taktak_banners', JSON.stringify(banners));
+        async function api(ruta, opciones) {
+            const conf = Object.assign({ headers: {} }, opciones || {});
+            conf.headers['Content-Type'] = 'application/json';
+            if (claveAdmin) conf.headers['Authorization'] = 'Bearer ' + claveAdmin;
+            const r = await fetch(ruta, conf);
+            const datos = await r.json().catch(function () { return {}; });
+            if (!r.ok) throw new Error(datos.error || ('Error ' + r.status));
+            return datos;
         }
 
-        // Manejo de Inicio de Sesión Administrador
+        async function cargarBanners() {
+            const badge = document.getElementById('estadoServidor');
+            try {
+                const datos = await api(API + '/api/banners');
+                banners = datos.banners || [];
+                servidorActivo = true;
+                const st = datos.stats || {};
+                if (badge) {
+                    badge.textContent = 'Servidor conectado - ' + (st.enlaces || 0) + ' enlaces - ' + (st.visitas || 0) + ' visitas';
+                    badge.className = 'text-[10px] text-green-400';
+                }
+            } catch (e) {
+                servidorActivo = false;
+                if (badge) {
+                    badge.textContent = 'Modo demostracion (sin servidor)';
+                    badge.className = 'text-[10px] text-yellow-500';
+                }
+            }
+            if (isAdminLoggedIn) renderAdminBanners();
+        }
+
+        function renderAdminBanners() {
+            const container = document.getElementById('bannersList');
+            if (!container) return;
+            container.innerHTML = '';
+            banners.forEach(function (ad) {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 bg-brave-dark border border-brave-border rounded-xl text-xs';
+                item.innerHTML =
+                    '<div class="flex items-center space-x-3">' +
+                    '<img src="' + ad.imagen + '" class="w-12 h-12 object-cover rounded-lg">' +
+                    '<h4 class="font-bold text-white">' + ad.titulo + '</h4>' +
+                    '</div>' +
+                    '<button onclick="deleteBanner(\'' + ad.id + '\')" class="text-red-400 hover:text-red-300 px-2 py-1">' +
+                    '<i class="fa-solid fa-trash"></i></button>';
+                container.appendChild(item);
+            });
+        }
+
         function toggleAdminModal() {
             document.getElementById('adminModal').classList.toggle('hidden');
         }
 
-        function handleAdminLogin(e) {
+        async function handleAdminLogin(e) {
             e.preventDefault();
             const email = document.getElementById('adminEmailInput').value.trim();
-
-            if (email === 'taktak.messenger@gmail.com') {
+            try {
+                const datos = await api(API + '/api/admin/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ correo: email })
+                });
+                claveAdmin = datos.clave;
+                localStorage.setItem('taktak_admin_clave', claveAdmin);
                 isAdminLoggedIn = true;
                 document.getElementById('adminPanel').classList.remove('hidden');
                 document.getElementById('adminBtnText').innerText = 'Admin Activo';
                 document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
                 toggleAdminModal();
                 renderAdminBanners();
-                alert("¡Bienvenido Administrador (taktak.messenger@gmail.com)!");
-            } else {
-                alert("Acceso denegado: El correo no corresponde a la cuenta administradora autorizada.");
+            } catch (err) {
+                alert('Acceso denegado: ' + err.message);
             }
         }
 
         function logoutAdmin() {
             isAdminLoggedIn = false;
+            claveAdmin = '';
+            localStorage.removeItem('taktak_admin_clave');
             document.getElementById('adminPanel').classList.add('hidden');
             document.getElementById('adminBtnText').innerText = 'Acceso Admin';
             document.getElementById('adminAuthBtn').classList.remove('bg-purple-600', 'text-white');
         }
 
-        // Agregar Anuncio
-        function handleAddBanner(e) {
+        async function handleAddBanner(e) {
             e.preventDefault();
-            const newBanner = {
-                id: Date.now(),
-                title: document.getElementById('adTitle').value,
-                sponsor: document.getElementById('adSponsor').value,
-                desc: document.getElementById('adDesc').value,
-                imageUrl: document.getElementById('adImageUrl').value,
-                targetUrl: document.getElementById('adTargetUrl').value
-            };
-            banners.push(newBanner);
-            renderAdminBanners();
-            e.target.reset();
-            alert("Banner agregado exitosamente.");
-        }
-
-        // Eliminar Anuncio
-        function deleteBanner(index) {
-            if (banners.length <= 1) {
-                alert("Debe haber al menos 1 banner activo en el sistema.");
-                return;
+            try {
+                const datos = await api(API + '/api/admin/banners', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        titulo: document.getElementById('adTitle').value,
+                        imagen: document.getElementById('adImageUrl').value,
+                        destino: document.getElementById('adTargetUrl').value
+                    })
+                });
+                banners = datos.banners;
+                renderAdminBanners();
+                e.target.reset();
+            } catch (err) {
+                alert(err.message);
             }
-            banners.splice(index, 1);
-            renderAdminBanners();
         }
 
-        // Acortar Enlace
-        function handleShorten(e) {
+        async function deleteBanner(id) {
+            try {
+                const datos = await api(API + '/api/admin/borrar', {
+                    method: 'POST',
+                    body: JSON.stringify({ id: id })
+                });
+                banners = datos.banners;
+                renderAdminBanners();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function handleShorten(e) {
             e.preventDefault();
             const input = document.getElementById('longUrlInput').value;
-            currentTargetUrl = input;
-            const slug = Math.random().toString(36).substring(2, 8);
-            const shortLink = `https://taktak.brave/${slug}`;
-            
-            document.getElementById('shortUrlOutput').value = shortLink;
-            document.getElementById('resultBox').classList.remove('hidden');
+            if (!servidorActivo) {
+                alert('Esta copia no esta conectada al servidor. Abre la version publicada en el servidor para generar enlaces reales.');
+                return;
+            }
+            try {
+                const datos = await api(API + '/api/acortar', {
+                    method: 'POST',
+                    body: JSON.stringify({ url: input })
+                });
+                currentTargetUrl = datos.destino;
+                document.getElementById('shortUrlOutput').value = datos.enlace;
+                document.getElementById('resultBox').classList.remove('hidden');
+                cargarBanners();
+            } catch (err) {
+                alert(err.message);
+            }
         }
 
         function copyLink() {
@@ -301,15 +328,19 @@
             alert("Enlace copiado al portapapeles.");
         }
 
-        // Simular Redirección con Publicidad de 3 Segundos
+        // Redirección con Publicidad de 3 Segundos (usa los banners del servidor)
         function simulateRedirect() {
             const modal = document.getElementById('redirectModal');
+            if (!banners.length) {
+                alert("Todavía no hay banners configurados en el servidor.");
+                return;
+            }
             const randomAd = banners[Math.floor(Math.random() * banners.length)];
-            
-            document.getElementById('activeAdImg').src = randomAd.imageUrl;
-            document.getElementById('activeAdTitle').innerText = randomAd.title;
-            document.getElementById('activeAdDesc').innerText = randomAd.desc;
-            document.getElementById('activeAdLink').href = randomAd.targetUrl;
+
+            document.getElementById('activeAdImg').src = randomAd.imagen;
+            document.getElementById('activeAdTitle').innerText = randomAd.titulo;
+            document.getElementById('activeAdDesc').innerText = "";
+            document.getElementById('activeAdLink').href = randomAd.destino;
 
             modal.classList.remove('hidden');
             
@@ -342,11 +373,33 @@
             }
         }
 
+        // Abrir el enlace corto real en una pestaña nueva (pasa por la página de anuncio)
+        function abrirEnlace() {
+            const url = document.getElementById('shortUrlOutput').value;
+            if (url) window.open(url, '_blank');
+        }
+
         // Simular Conexión de Brave Wallet
         function connectWallet() {
             document.getElementById('walletText').innerText = "0x71C...4B9 (Brave)";
             alert("Brave Wallet conectada exitosamente.");
         }
+
+        // Arranque: cargar banners y, si había sesión de admin, reabrir el panel
+        cargarBanners().then(function () {
+            if (claveAdmin) {
+                api(API + '/api/enlaces').then(function () {
+                    isAdminLoggedIn = true;
+                    document.getElementById('adminPanel').classList.remove('hidden');
+                    document.getElementById('adminBtnText').innerText = 'Admin Activo';
+                    document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
+                    renderAdminBanners();
+                }).catch(function () {
+                    claveAdmin = '';
+                    localStorage.removeItem('taktak_admin_clave');
+                });
+            }
+        });
     </script>
 </body>
 </html>

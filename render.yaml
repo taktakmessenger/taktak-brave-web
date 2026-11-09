@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: taktak-brave-shortener
+    runtime: python
+    plan: free
+    buildCommand: ""            # sin dependencias: solo la libreria estandar
+    startCommand: python3 servidor/servidor.py
+    autoDeploy: true
+    envVars:
+      - key: TAKTAK_ADMIN
+        value: taktak.messenger@gmail.com
+      - key: MAX_BANNERS
+        value: "20"
+      - key: TOPE_POR_HORA
+        value: "10"
+      # Para conservar los enlaces entre reinicios, sube a un plan de pago
+      # y monta un disco en /var/data, luego define:
+      # - key: TAKTAK_DB
+      #   value: /var/data/taktak.db
