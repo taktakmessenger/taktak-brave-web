@@ -158,6 +158,9 @@
                     </button>
                 </div>
                 <p id="estadoServidor" class="text-[10px] text-gray-500 mt-2">Conectando con el servidor...</p>
+                <div id="avisoLocal" class="hidden mt-3 pt-3 border-t border-brave-border">
+                    <p class="text-[11px] text-yellow-500/90">Estás en la copia sin servidor. Tu enlace <b>sí funciona</b>: quien lo abra verá tu anuncio de 3 segundos y seguirá a la web de destino. Pulsa <b>Abrir</b> para probarlo. Los enlaces cortos tipo <span class="font-mono">/CODIGO</span> necesitan el servidor.</p>
+                </div>
             </div>
         </section>
 
@@ -426,6 +429,7 @@
         let banners = [];
         let isAdminLoggedIn = false;
         let currentTargetUrl = "";
+        let currentTargetAd = null;
         let countdownTimer = null;
 
         // Administradores. Sirven de respaldo cuando la web corre sin servidor
@@ -449,6 +453,36 @@
 
         function bannersLocalGuardar(lista) {
             localStorage.setItem('taktak_banners', JSON.stringify(lista));
+        }
+
+        function bannerPorDefecto() {
+            return {
+                id: 'demo',
+                titulo: 'TakTak.brave - Tu acortador Web3',
+                imagen: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&auto=format&fit=crop&q=60',
+                destino: 'https://taktak.brave'
+            };
+        }
+
+        // Enlaces sin servidor: el destino y el anuncio viajan dentro del propio
+        // enlace (#ir=...) y la pagina muestra el anuncio 3 segundos antes de seguir.
+        function codificarB64(texto) {
+            return btoa(unescape(encodeURIComponent(texto)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        function decodificarB64(texto) {
+            let t = String(texto).replace(/-/g, '+').replace(/_/g, '/');
+            while (t.length % 4) t += '=';
+            return decodeURIComponent(escape(atob(t)));
+        }
+
+        function enlaceLocal(destino) {
+            let lista = (banners && banners.length) ? banners : bannersLocalLeer();
+            if (!lista.length) lista = [bannerPorDefecto()];
+            const ad = lista[Math.floor(Math.random() * lista.length)];
+            const carga = { u: destino, a: { t: ad.titulo || '', i: ad.imagen || '', d: ad.destino || '' } };
+            return location.origin + location.pathname + '#ir=' + codificarB64(JSON.stringify(carga));
         }
 
         function entrarComoAdmin(correo) {
@@ -971,23 +1005,33 @@
 
         async function handleShorten(e) {
             e.preventDefault();
-            const input = document.getElementById('longUrlInput').value;
-            if (!servidorActivo) {
-                alert('Esta copia no esta conectada al servidor. Abre la version publicada en el servidor para generar enlaces reales.');
+            const input = document.getElementById('longUrlInput').value.trim();
+            if (!/^https?:\/\//i.test(input)) {
+                alert('Escribe una dirección que empiece por http:// o https://');
                 return;
             }
-            try {
-                const datos = await api(API + '/api/acortar', {
-                    method: 'POST',
-                    body: JSON.stringify({ url: input })
-                });
-                currentTargetUrl = datos.destino;
-                document.getElementById('shortUrlOutput').value = datos.enlace;
-                document.getElementById('resultBox').classList.remove('hidden');
-                cargarBanners();
-            } catch (err) {
-                alert(err.message);
+            if (servidorActivo) {
+                try {
+                    const datos = await api(API + '/api/acortar', {
+                        method: 'POST',
+                        body: JSON.stringify({ url: input })
+                    });
+                    currentTargetUrl = datos.destino;
+                    document.getElementById('shortUrlOutput').value = datos.enlace;
+                    document.getElementById('avisoLocal').classList.add('hidden');
+                    document.getElementById('resultBox').classList.remove('hidden');
+                    cargarBanners();
+                } catch (err) {
+                    alert(err.message);
+                }
+                return;
             }
+            // Sin servidor: el enlace lleva el destino dentro y pasa por el anuncio.
+            currentTargetUrl = input;
+            currentTargetAd = null;
+            document.getElementById('shortUrlOutput').value = enlaceLocal(input);
+            document.getElementById('avisoLocal').classList.remove('hidden');
+            document.getElementById('resultBox').classList.remove('hidden');
         }
 
         function copyLink() {
@@ -1000,11 +1044,14 @@
         // Redirección con Publicidad de 3 Segundos (usa los banners del servidor)
         function simulateRedirect() {
             const modal = document.getElementById('redirectModal');
-            if (!banners.length) {
-                alert("Todavía no hay banners configurados en el servidor.");
-                return;
+            let randomAd;
+            if (currentTargetAd && (currentTargetAd.t || currentTargetAd.i)) {
+                randomAd = { titulo: currentTargetAd.t || 'Patrocinado', imagen: currentTargetAd.i || '', destino: currentTargetAd.d || '#' };
+            } else {
+                let lista = (banners && banners.length) ? banners : bannersLocalLeer();
+                if (!lista.length) lista = [bannerPorDefecto()];
+                randomAd = lista[Math.floor(Math.random() * lista.length)];
             }
-            const randomAd = banners[Math.floor(Math.random() * banners.length)];
 
             document.getElementById('activeAdImg').src = randomAd.imagen;
             document.getElementById('activeAdTitle').innerText = randomAd.titulo;
@@ -1038,14 +1085,38 @@
         function executeFinalRedirect() {
             document.getElementById('redirectModal').classList.add('hidden');
             if (currentTargetUrl) {
-                window.open(currentTargetUrl, '_blank');
+                if (/^https?:\/\//i.test(currentTargetUrl)) {
+                    window.location.href = currentTargetUrl;
+                } else {
+                    window.open(currentTargetUrl, '_blank');
+                }
             }
         }
 
         // Abrir el enlace corto real en una pestaña nueva (pasa por la página de anuncio)
         function abrirEnlace() {
             const url = document.getElementById('shortUrlOutput').value;
-            if (url) window.open(url, '_blank');
+            if (!url) return;
+            if (url.indexOf('#ir=') !== -1) {
+                simulateRedirect();
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
+        // Si alguien abre un enlace #ir=... : mostrar el anuncio y seguir al destino.
+        function abrirEnlaceDirecto() {
+            const m = location.hash.match(/#ir=([A-Za-z0-9_-]+)/);
+            if (!m) return;
+            let carga;
+            try {
+                carga = JSON.parse(decodificarB64(m[1]));
+            } catch (e) {
+                return;
+            }
+            currentTargetUrl = (typeof carga === 'string') ? carga : carga.u;
+            currentTargetAd = (carga && carga.a) ? carga.a : null;
+            if (currentTargetUrl) simulateRedirect();
         }
 
         // Conexión con Brave Wallet / Web3 (real si hay billetera; si no, billetera demo)
@@ -1276,6 +1347,7 @@
             cargarLoteria();
             setInterval(pintarCuentaAtras, 1000);
             setInterval(function () { if (servidorActivo) cargarLoteria(); }, 15000);
+            abrirEnlaceDirecto();
             if (claveAdmin) {
                 api(API + '/api/enlaces').then(function () {
                     entrarComoAdmin();
