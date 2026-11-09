@@ -26,147 +26,207 @@
     </script>
 </head>
 <body class="bg-brave-dark text-gray-100 font-sans min-h-screen flex flex-col justify-between">
+
+    <!-- HEADER / NAVIGATION -->
     <header class="border-b border-brave-border bg-brave-card/80 backdrop-blur-md sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brave-orange to-purple-600 flex items-center justify-center font-bold text-xl shadow-lg shadow-brave-orange/20">T</div>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brave-orange to-purple-600 flex items-center justify-center font-bold text-xl shadow-lg shadow-brave-orange/20">
+                    T
+                </div>
                 <div>
                     <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">TakTak<span class="text-brave-orange">.brave</span></h1>
                     <p class="text-xs text-gray-400">Web3 Link Shortener & Ad Engine</p>
                 </div>
             </div>
+
             <div class="flex items-center space-x-3">
-                <button id="adminAuthBtn" onclick="toggleAdminModal()" class="px-3 py-1.5 rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 text-xs font-semibold flex items-center gap-2 transition"><i class="fa-solid fa-lock"></i> <span id="adminBtnText">Acceso Admin</span></button>
-                <button id="walletBtn" onclick="connectWallet()" class="px-4 py-2 rounded-xl bg-brave-orange hover:bg-orange-600 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-brave-orange/20 transition"><i class="fa-solid fa-wallet"></i> <span id="walletText">Conectar Brave Wallet</span></button>
+                <button id="adminAuthBtn" onclick="toggleAdminModal()" class="px-3 py-1.5 rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 text-xs font-semibold flex items-center gap-2 transition">
+                    <i class="fa-solid fa-lock"></i> <span id="adminBtnText">Acceso Admin</span>
+                </button>
+                <button id="walletBtn" onclick="connectWallet()" class="px-4 py-2 rounded-xl bg-brave-orange hover:bg-orange-600 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-brave-orange/20 transition">
+                    <i class="fa-solid fa-wallet"></i> <span id="walletText">Conectar Brave Wallet</span>
+                </button>
             </div>
         </div>
     </header>
 
+    <!-- MAIN CONTENT CONTAINER -->
     <main class="max-w-4xl mx-auto px-4 py-8 w-full flex-1">
+        
+        <!-- ACORTADOR DE ENLACES -->
         <section class="bg-brave-card border border-brave-border p-6 rounded-2xl shadow-2xl mb-8">
             <h2 class="text-lg font-bold mb-4 text-gray-200"><i class="fa-solid fa-link text-brave-orange mr-2"></i>Acortar un nuevo enlace</h2>
             <form onsubmit="handleShorten(event)" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1" for="longUrlInput">URL de Destino</label>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">URL de Destino</label>
                     <input type="url" id="longUrlInput" required placeholder="https://tu-proyecto-web3.com/metaverso" class="w-full bg-brave-dark border border-brave-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brave-orange">
                 </div>
-                <button type="submit" class="w-full bg-gradient-to-r from-brave-orange to-purple-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition">Generar TakTak Link (con Ad de 3s)</button>
+                <button type="submit" class="w-full bg-gradient-to-r from-brave-orange to-purple-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition">
+                    Generar TakTak Link (con Ad de 3s)
+                </button>
             </form>
+
             <div id="resultBox" class="hidden mt-6 p-4 bg-brave-dark rounded-xl border border-brave-orange/40">
                 <p class="text-xs text-gray-400 mb-1">¡Tu enlace acortado está listo!</p>
                 <div class="flex items-center justify-between gap-2">
                     <input type="text" id="shortUrlOutput" readonly class="bg-transparent font-mono text-brave-orange text-sm w-full focus:outline-none">
-                    <button onclick="copyLink()" class="px-3 py-1.5 bg-brave-border hover:bg-gray-700 text-xs rounded-lg font-semibold flex items-center gap-1"><i class="fa-solid fa-copy"></i> Copiar</button>
-                    <button onclick="simulateRedirect()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-xs rounded-lg font-semibold text-white flex items-center gap-1"><i class="fa-solid fa-play"></i> Probar</button>
+                    <button onclick="copyLink()" class="px-3 py-1.5 bg-brave-border hover:bg-gray-700 text-xs rounded-lg font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-copy"></i> Copiar
+                    </button>
+                    <button onclick="simulateRedirect()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-xs rounded-lg font-semibold text-white flex items-center gap-1">
+                        <i class="fa-solid fa-play"></i> Probar
+                    </button>
                 </div>
             </div>
         </section>
 
+        <!-- PANEL ADMINISTRADOR (Solo visible al autenticar como taktak.messenger@gmail.com) -->
         <section id="adminPanel" class="hidden bg-brave-card border border-purple-500/50 p-6 rounded-2xl shadow-2xl mb-8 relative">
             <div class="flex items-center justify-between mb-4 pb-2 border-b border-brave-border">
-                <h2 class="text-lg font-bold text-purple-400 flex items-center gap-2"><i class="fa-solid fa-user-shield"></i> Panel Administrador (<span class="text-xs text-white">taktak.messenger@gmail.com</span>)</h2>
+                <h2 class="text-lg font-bold text-purple-400 flex items-center gap-2">
+                    <i class="fa-solid fa-user-shield"></i> Panel Administrador (<span class="text-xs text-white">taktak.messenger@gmail.com</span>)
+                </h2>
                 <button onclick="logoutAdmin()" class="text-xs text-red-400 hover:underline">Cerrar Sesión Admin</button>
             </div>
+
+            <!-- Formulario para agregar nuevo banner de publicidad -->
             <form onsubmit="handleAddBanner(event)" class="space-y-4 mb-6 bg-brave-dark p-4 rounded-xl border border-brave-border">
                 <h3 class="text-sm font-semibold text-gray-300">Agregar Nuevo Banner de Publicidad Web3</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div><label class="block text-xs text-gray-400 mb-1" for="adTitle">Título del Anuncio</label><input type="text" id="adTitle" required placeholder="Ej: DeFi Staking Pro" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500"></div>
-                    <div><label class="block text-xs text-gray-400 mb-1" for="adSponsor">Patrocinador / Marca</label><input type="text" id="adSponsor" required placeholder="Ej: Brave Ads Network" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500"></div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Título del Anuncio</label>
+                        <input type="text" id="adTitle" required placeholder="Ej: DeFi Staking Pro" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Patrocinador / Marca</label>
+                        <input type="text" id="adSponsor" required placeholder="Ej: Brave Ads Network" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
+                    </div>
                 </div>
-                <div><label class="block text-xs text-gray-400 mb-1" for="adDesc">Descripción Corta</label><input type="text" id="adDesc" required placeholder="Ej: Obtén 12% APY haciendo staking de BAT." class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500"></div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Descripción Corta</label>
+                    <input type="text" id="adDesc" required placeholder="Ej: Obten 12% APY staking tus BAT tokens sin comisiones." class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div><label class="block text-xs text-gray-400 mb-1" for="adImageUrl">URL de Imagen/Banner (HTTPS)</label><input type="url" id="adImageUrl" required placeholder="https://images.unsplash.com/photo-xxx..." class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500"></div>
-                    <div><label class="block text-xs text-gray-400 mb-1" for="adTargetUrl">URL del Enlace de Destino del Anuncio</label><input type="url" id="adTargetUrl" required placeholder="https://brave.com/rewards" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500"></div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">URL de Imagen/Banner (HTTPS)</label>
+                        <input type="url" id="adImageUrl" required placeholder="https://images.unsplash.com/photo-xxx..." class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">URL del Enlace de Destino del Anuncio</label>
+                        <input type="url" id="adTargetUrl" required placeholder="https://brave.com/rewards" class="w-full bg-brave-card border border-brave-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500">
+                    </div>
                 </div>
-                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg text-xs transition">+ Guardar Banner Publicitario</button>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg text-xs transition">
+                    + Guardar Banner Publicitario
+                </button>
             </form>
+
+            <!-- Lista de Banners Activos -->
             <h3 class="text-sm font-semibold text-gray-300 mb-3">Banners Publicitarios Activos en el Sistema</h3>
-            <div id="bannersList" class="space-y-3"></div>
+            <div id="bannersList" class="space-y-3">
+                <!-- Se puebla dinámicamente mediante JS -->
+            </div>
         </section>
+
     </main>
 
+    <!-- MODAL INICIAR SESIÓN ADMIN -->
     <div id="adminModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-brave-card border border-purple-500/50 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative">
             <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2"><i class="fa-solid fa-lock text-purple-400"></i> Acceso Administrador</h3>
             <p class="text-xs text-gray-400 mb-4">Introduce la cuenta administradora autorizada para gestionar la publicidad.</p>
             <form onsubmit="handleAdminLogin(event)" class="space-y-4">
-                <div><label class="block text-xs text-gray-400 mb-1" for="adminEmailInput">Correo Electrónico</label><input type="email" id="adminEmailInput" required placeholder="taktak.messenger@gmail.com" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500"></div>
-                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Verificar y Entrar</button>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Correo Electrónico</label>
+                    <input type="email" id="adminEmailInput" required placeholder="taktak.messenger@gmail.com" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+                </div>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
+                    Verificar y Entrar
+                </button>
                 <button type="button" onclick="toggleAdminModal()" class="w-full text-center text-xs text-gray-400 hover:underline">Cancelar</button>
             </form>
         </div>
     </div>
 
+    <!-- MODAL DE REDIRECCIÓN INTERSTELAR (3 SEGUNDOS DE ANUNCIO) -->
     <div id="redirectModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="bg-brave-card border border-brave-orange/50 w-full max-w-md rounded-2xl p-6 shadow-2xl text-center relative">
-            <div class="flex justify-between items-center mb-4 border-b border-brave-border pb-2"><span class="text-xs font-semibold text-brave-orange uppercase tracking-wider"><i class="fa-solid fa-bolt mr-1"></i> TakTak Interstellar Redirect</span><span class="text-xs text-gray-400">Redirigiendo...</span></div>
+            <div class="flex justify-between items-center mb-4 border-b border-brave-border pb-2">
+                <span class="text-xs font-semibold text-brave-orange uppercase tracking-wider"><i class="fa-solid fa-bolt mr-1"></i> TakTak Interstellar Redirect</span>
+                <span class="text-xs text-gray-400">Redirigiendo...</span>
+            </div>
+
+            <!-- Banner Activo de Publicidad -->
             <div class="my-4 bg-brave-dark border border-brave-border rounded-xl p-3 text-left">
                 <span class="text-[10px] font-bold bg-brave-orange/20 text-brave-orange px-2 py-0.5 rounded uppercase">Patrocinado</span>
                 <img id="activeAdImg" src="" alt="Publicidad Web3" class="w-full h-36 object-cover rounded-lg my-2">
                 <h4 id="activeAdTitle" class="font-bold text-sm text-white">---</h4>
                 <p id="activeAdDesc" class="text-xs text-gray-400 mt-1">---</p>
-                <a id="activeAdLink" href="#" target="_blank" rel="noopener noreferrer" class="block text-center mt-3 bg-brave-border hover:bg-gray-700 text-white text-xs font-bold py-1.5 rounded-lg">Visitar Anuncio</a>
+                <a id="activeAdLink" href="#" target="_blank" class="block text-center mt-3 bg-brave-border hover:bg-gray-700 text-white text-xs font-bold py-1.5 rounded-lg">Visitar Anuncio</a>
             </div>
+
+            <!-- Contador de 3 Segundos -->
             <div class="mt-4">
-                <div id="countdownCircle" class="w-12 h-12 rounded-full bg-brave-orange/20 border-2 border-brave-orange text-brave-orange text-xl font-bold flex items-center justify-center mx-auto mb-2">3</div>
-                <button id="skipBtn" disabled onclick="executeFinalRedirect()" class="w-full bg-gray-800 text-gray-500 font-bold py-3 rounded-xl text-sm transition">Espere 3 segundos...</button>
+                <div id="countdownCircle" class="w-12 h-12 rounded-full bg-brave-orange/20 border-2 border-brave-orange text-brave-orange text-xl font-bold flex items-center justify-center mx-auto mb-2">
+                    3
+                </div>
+                <button id="skipBtn" disabled onclick="executeFinalRedirect()" class="w-full bg-gray-800 text-gray-500 font-bold py-3 rounded-xl text-sm transition">
+                    Espere 3 segundos...
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        const DEFAULT_BANNERS = [{
-            id: 1,
-            title: "Brave Rewards & BAT Staking",
-            sponsor: "Brave Ecosystem",
-            desc: "Gana tokens BAT por navegar con privacidad y accede a beneficios exclusivos.",
-            imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&auto=format&fit=crop&q=60",
-            targetUrl: "https://brave.com/rewards"
-        }];
+        // Configuración por defecto de Banners
+        const DEFAULT_BANNERS = [
+            {
+                id: 1,
+                title: "Brave Rewards & BAT Staking",
+                sponsor: "Brave Ecosystem",
+                desc: "Gana tokens BAT por navegar con privacidad y accede a beneficios exclusivos.",
+                imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&auto=format&fit=crop&q=60",
+                targetUrl: "https://brave.com/rewards"
+            }
+        ];
 
+        // Estado Global
         let banners;
         try {
-            const savedBanners = JSON.parse(localStorage.getItem('taktak_banners'));
-            banners = Array.isArray(savedBanners) && savedBanners.length ? savedBanners : DEFAULT_BANNERS;
+            const saved = JSON.parse(localStorage.getItem('taktak_banners'));
+            banners = Array.isArray(saved) && saved.length ? saved : DEFAULT_BANNERS;
         } catch {
             banners = DEFAULT_BANNERS;
         }
+        let isAdminLoggedIn = false;
         let currentTargetUrl = "";
         let countdownTimer = null;
 
+        // Cargar Banners al Iniciar
         function renderAdminBanners() {
             const container = document.getElementById('bannersList');
-            container.replaceChildren();
+            container.innerHTML = '';
+
             banners.forEach((ad, index) => {
                 const item = document.createElement('div');
                 item.className = "flex items-center justify-between p-3 bg-brave-dark border border-brave-border rounded-xl text-xs";
-                const details = document.createElement('div');
-                details.className = "flex items-center space-x-3";
-                const image = document.createElement('img');
-                image.src = ad.imageUrl;
-                image.alt = '';
-                image.className = "w-12 h-12 object-cover rounded-lg";
-                const text = document.createElement('div');
-                const title = document.createElement('h4');
-                title.className = "font-bold text-white";
-                title.textContent = `${ad.title} (${ad.sponsor})`;
-                const description = document.createElement('p');
-                description.className = "text-gray-400 text-[11px]";
-                description.textContent = ad.desc;
-                text.append(title, description);
-                details.append(image, text);
-                const remove = document.createElement('button');
-                remove.type = 'button';
-                remove.className = "text-red-400 hover:text-red-300 px-2 py-1";
-                remove.setAttribute('aria-label', `Eliminar ${ad.title}`);
-                remove.innerHTML = '<i class="fa-solid fa-trash" aria-hidden="true"></i>';
-                remove.addEventListener('click', () => deleteBanner(index));
-                item.append(details, remove);
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <img src="${ad.imageUrl}" class="w-12 h-12 object-cover rounded-lg">
+                        <div>
+                            <h4 class="font-bold text-white">${ad.title} <span class="text-[10px] text-gray-400">(${ad.sponsor})</span></h4>
+                            <p class="text-gray-400 text-[11px]">${ad.desc}</p>
+                        </div>
+                    </div>
+                    <button onclick="deleteBanner(${index})" class="text-red-400 hover:text-red-300 px-2 py-1"><i class="fa-solid fa-trash"></i></button>
+                `;
                 container.appendChild(item);
             });
-            try { localStorage.setItem('taktak_banners', JSON.stringify(banners)); } catch (error) { console.error('No se pudieron guardar los banners.', error); }
+            localStorage.setItem('taktak_banners', JSON.stringify(banners));
         }
 
+        // Manejo de Inicio de Sesión Administrador
         function toggleAdminModal() {
             document.getElementById('adminModal').classList.toggle('hidden');
         }
@@ -174,40 +234,45 @@
         function handleAdminLogin(e) {
             e.preventDefault();
             const email = document.getElementById('adminEmailInput').value.trim();
+
             if (email === 'taktak.messenger@gmail.com') {
+                isAdminLoggedIn = true;
                 document.getElementById('adminPanel').classList.remove('hidden');
                 document.getElementById('adminBtnText').innerText = 'Admin Activo';
                 document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
                 toggleAdminModal();
                 renderAdminBanners();
-                alert("Acceso de demostración habilitado. Esta comprobación local no es autenticación segura.");
+                alert("¡Bienvenido Administrador (taktak.messenger@gmail.com)!");
             } else {
                 alert("Acceso denegado: El correo no corresponde a la cuenta administradora autorizada.");
             }
         }
 
         function logoutAdmin() {
+            isAdminLoggedIn = false;
             document.getElementById('adminPanel').classList.add('hidden');
             document.getElementById('adminBtnText').innerText = 'Acceso Admin';
             document.getElementById('adminAuthBtn').classList.remove('bg-purple-600', 'text-white');
         }
 
+        // Agregar Anuncio
         function handleAddBanner(e) {
             e.preventDefault();
             const newBanner = {
                 id: Date.now(),
-                title: document.getElementById('adTitle').value.trim(),
-                sponsor: document.getElementById('adSponsor').value.trim(),
-                desc: document.getElementById('adDesc').value.trim(),
+                title: document.getElementById('adTitle').value,
+                sponsor: document.getElementById('adSponsor').value,
+                desc: document.getElementById('adDesc').value,
                 imageUrl: document.getElementById('adImageUrl').value,
                 targetUrl: document.getElementById('adTargetUrl').value
             };
             banners.push(newBanner);
             renderAdminBanners();
             e.target.reset();
-            alert("Banner agregado en este navegador.");
+            alert("Banner agregado exitosamente.");
         }
 
+        // Eliminar Anuncio
         function deleteBanner(index) {
             if (banners.length <= 1) {
                 alert("Debe haber al menos 1 banner activo en el sistema.");
@@ -217,38 +282,37 @@
             renderAdminBanners();
         }
 
+        // Acortar Enlace
         function handleShorten(e) {
             e.preventDefault();
-            currentTargetUrl = document.getElementById('longUrlInput').value;
+            const input = document.getElementById('longUrlInput').value;
+            currentTargetUrl = input;
             const slug = Math.random().toString(36).substring(2, 8);
-            const shortLink = `${window.location.origin}/${slug}`;
+            const shortLink = `https://taktak.brave/${slug}`;
+            
             document.getElementById('shortUrlOutput').value = shortLink;
             document.getElementById('resultBox').classList.remove('hidden');
         }
 
-        async function copyLink() {
-            const value = document.getElementById('shortUrlOutput').value;
-            try {
-                await navigator.clipboard.writeText(value);
-                alert("Enlace copiado al portapapeles.");
-            } catch {
-                const input = document.getElementById('shortUrlOutput');
-                input.select();
-                document.execCommand('copy');
-                alert("Enlace copiado al portapapeles.");
-            }
+        function copyLink() {
+            const input = document.getElementById('shortUrlOutput');
+            input.select();
+            document.execCommand('copy');
+            alert("Enlace copiado al portapapeles.");
         }
 
+        // Simular Redirección con Publicidad de 3 Segundos
         function simulateRedirect() {
-            if (!banners.length || !currentTargetUrl) return;
-            if (countdownTimer) clearInterval(countdownTimer);
             const modal = document.getElementById('redirectModal');
             const randomAd = banners[Math.floor(Math.random() * banners.length)];
+            
             document.getElementById('activeAdImg').src = randomAd.imageUrl;
             document.getElementById('activeAdTitle').innerText = randomAd.title;
             document.getElementById('activeAdDesc').innerText = randomAd.desc;
             document.getElementById('activeAdLink').href = randomAd.targetUrl;
+
             modal.classList.remove('hidden');
+            
             let seconds = 3;
             const circle = document.getElementById('countdownCircle');
             const btn = document.getElementById('skipBtn');
@@ -256,12 +320,12 @@
             btn.disabled = true;
             btn.className = "w-full bg-gray-800 text-gray-500 font-bold py-3 rounded-xl text-sm";
             btn.innerText = `Espere ${seconds} segundos...`;
+
             countdownTimer = setInterval(() => {
                 seconds--;
                 circle.innerText = seconds;
                 if (seconds <= 0) {
                     clearInterval(countdownTimer);
-                    countdownTimer = null;
                     btn.disabled = false;
                     btn.className = "w-full bg-brave-orange hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-sm transition";
                     btn.innerText = "Continuar a la web de destino ->";
@@ -272,23 +336,16 @@
         }
 
         function executeFinalRedirect() {
-            if (countdownTimer) return;
             document.getElementById('redirectModal').classList.add('hidden');
-            if (currentTargetUrl) window.open(currentTargetUrl, '_blank', 'noopener,noreferrer');
+            if (currentTargetUrl) {
+                window.open(currentTargetUrl, '_blank');
+            }
         }
 
+        // Simular Conexión de Brave Wallet
         function connectWallet() {
-            const provider = window.ethereum;
-            if (!provider || typeof provider.request !== 'function') {
-                alert("No se detectó una wallet compatible en este navegador.");
-                return;
-            }
-            provider.request({ method: 'eth_requestAccounts' })
-                .then(accounts => {
-                    const account = accounts && accounts[0];
-                    if (account) document.getElementById('walletText').innerText = `${account.slice(0, 5)}...${account.slice(-4)}`;
-                })
-                .catch(error => alert(error.message || "No se pudo conectar la wallet."));
+            document.getElementById('walletText').innerText = "0x71C...4B9 (Brave)";
+            alert("Brave Wallet conectada exitosamente.");
         }
     </script>
 </body>
