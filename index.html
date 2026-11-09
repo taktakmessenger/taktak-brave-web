@@ -256,6 +256,16 @@
                     🎲 Realizar sorteo de hoy y elegir ganador
                 </button>
             </div>
+
+            <!-- Cuentas de jugadores: borrar para volver a registrar -->
+            <div class="mt-6 pt-4 border-t border-brave-border space-y-3">
+                <h3 class="text-sm font-semibold text-gray-300">Cuentas de jugadores</h3>
+                <p class="text-[11px] text-gray-400">Borra una cuenta de jugador para que esa persona pueda registrarse otra vez desde cero.</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="email" id="adminBorrarCorreo" placeholder="correo@deljugador.com" class="flex-1 bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+                    <button onclick="adminBorrarCuenta()" class="min-h-[44px] px-4 py-2 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-semibold transition">Borrar cuenta</button>
+                </div>
+            </div>
         </section>
 
     </main>
@@ -364,6 +374,12 @@
                 </div>
 
                 <button type="button" onclick="cambiarPestana('entrar')" class="w-full text-center text-xs text-gray-500 hover:text-white">Volver a Entrar</button>
+
+                <!-- Solo en modo sin servidor: borra la cuenta guardada en este navegador -->
+                <div id="recBorrarCuenta" class="hidden bg-brave-dark/60 border border-red-500/30 rounded-lg p-3 space-y-2 text-left">
+                    <p class="text-[11px] text-gray-400">¿Te equivocaste al registrarte o quieres empezar de nuevo? Borra esta cuenta de este navegador y podrás registrarla otra vez.</p>
+                    <button type="button" onclick="borrarCuentaLocal()" class="w-full border border-red-500/40 text-red-400 hover:bg-red-500/10 font-bold py-2.5 rounded-xl text-sm transition">Borrar mi cuenta y registrarme otra vez</button>
+                </div>
             </div>
         </div>
     </div>
@@ -516,6 +532,28 @@
             }
         }
 
+        async function adminBorrarCuenta() {
+            const correo = document.getElementById('adminBorrarCorreo').value.trim().toLowerCase();
+            if (!correo) { alert('Escribe el correo del jugador.'); return; }
+            if (!confirm('¿Borrar la cuenta de ' + correo + '?\n\nEsa persona podrá registrarse otra vez desde cero.')) return;
+            if (servidorActivo) {
+                try {
+                    await api(API + '/api/admin/borrar-usuario', { method: 'POST', body: JSON.stringify({ correo: correo }) });
+                    alert('Cuenta borrada: ' + correo);
+                    document.getElementById('adminBorrarCorreo').value = '';
+                } catch (err) {
+                    alert(err.message);
+                }
+                return;
+            }
+            if (borrarCuentaDe(correo)) {
+                alert('Cuenta borrada de este navegador: ' + correo);
+                document.getElementById('adminBorrarCorreo').value = '';
+            } else {
+                alert('Ese correo no está registrado en este navegador.');
+            }
+        }
+
         async function handleAdminLogin(e) {
             e.preventDefault();
             const email = document.getElementById('adminEmailInput').value.trim();
@@ -614,6 +652,8 @@
                 recup.classList.remove('hidden');
                 tabE.className = inactivo; tabR.className = inactivo;
                 recuperarReiniciar();
+                const bc = document.getElementById('recBorrarCuenta');
+                if (bc) bc.classList.toggle('hidden', servidorActivo);
             } else {
                 entrar.classList.remove('hidden');
                 tabE.className = activo; tabR.className = inactivo;
@@ -751,6 +791,25 @@
             pintarUsuario();
         }
 
+        // Registra; si el correo ya está en este navegador (modo sin servidor),
+        // ofrece borrarlo y registrarlo otra vez con la clave nueva.
+        async function registrarOFresco(email, clave, pregunta, respuesta) {
+            try {
+                await registrarUsuario(email, clave, pregunta, respuesta);
+                return true;
+            } catch (err) {
+                if (!servidorActivo && /ya est[áa] registrado/i.test(err.message)) {
+                    if (confirm('El correo ' + email + ' ya está registrado en este navegador.\n\n¿Quieres borrarlo y registrarlo otra vez con esta clave?')) {
+                        borrarCuentaDe(email);
+                        await registrarUsuario(email, clave, pregunta, respuesta);
+                        return true;
+                    }
+                    return false;
+                }
+                throw err;
+            }
+        }
+
         async function entrarUsuario(email, clave) {
             if (servidorActivo) {
                 const datos = await api(API + '/api/usuarios/login', {
@@ -776,6 +835,36 @@
             pintarUsuario();
         }
 
+        // Borra una cuenta guardada en este navegador (modo sin servidor).
+        function borrarCuentaDe(email) {
+            email = (email || '').trim().toLowerCase();
+            let usuarios = {};
+            try { usuarios = JSON.parse(localStorage.getItem('taktak_usuarios') || '{}'); } catch (e) { usuarios = {}; }
+            if (!usuarios[email]) return false;
+            delete usuarios[email];
+            localStorage.setItem('taktak_usuarios', JSON.stringify(usuarios));
+            if (usuarioActual === email) {
+                usuarioActual = '';
+                localStorage.removeItem('taktak_usuario');
+                pintarUsuario();
+            }
+            return true;
+        }
+
+        function borrarCuentaLocal() {
+            const email = document.getElementById('recEmail').value.trim().toLowerCase();
+            if (!email) { alert('Escribe primero tu correo arriba.'); return; }
+            if (!confirm('¿Borrar la cuenta ' + email + ' de este navegador?\n\nDespués podrás registrarla otra vez como la primera vez.')) return;
+            if (borrarCuentaDe(email)) {
+                alert('Listo. La cuenta ' + email + ' se borró de este navegador.');
+            } else {
+                alert('Ese correo no está registrado en este navegador.');
+            }
+            cambiarPestana('registrar');
+            document.getElementById('modalRegEmail').value = email;
+            document.getElementById('modalRegClave').value = '';
+        }
+
         // Registro desde la sección pública (con enlace compartible)
         async function handleRegistro(e) {
             e.preventDefault();
@@ -783,7 +872,8 @@
             const clave = document.getElementById('regClave').value;
             if (clave.length < 6) { alert('La clave debe tener al menos 6 caracteres.'); return; }
             try {
-                await registrarUsuario(email, clave);
+                const creada = await registrarOFresco(email, clave);
+                if (!creada) return;
                 document.getElementById('regClave').value = '';
                 alert('¡Cuenta creada! Ya puedes usar TakTak.brave con tu correo.');
             } catch (err) {
@@ -801,7 +891,8 @@
             if (clave.length < 6) { alert('La clave debe tener al menos 6 caracteres.'); return; }
             if (pregunta && !respuesta) { alert('Escribe la respuesta de tu pregunta secreta.'); return; }
             try {
-                await registrarUsuario(email, clave, pregunta, respuesta);
+                const creada = await registrarOFresco(email, clave, pregunta, respuesta);
+                if (!creada) return;
                 document.getElementById('modalRegClave').value = '';
                 document.getElementById('modalRegRespuesta').value = '';
                 cerrarAcceso();
