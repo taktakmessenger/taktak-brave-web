@@ -291,6 +291,7 @@
                     <input type="password" id="entrarClave" required autocomplete="current-password" placeholder="Tu clave" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
                 </div>
                 <button type="submit" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Entrar</button>
+                <button type="button" onclick="cambiarPestana('recuperar')" class="w-full text-center text-xs text-brave-orange hover:underline">¿Olvidaste tu clave?</button>
             </form>
 
             <!-- Formulario: registrarse -->
@@ -303,8 +304,56 @@
                     <label class="block text-xs text-gray-400 mb-1">Crea una clave</label>
                     <input type="password" id="modalRegClave" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
                 </div>
+                <div class="bg-brave-dark/60 border border-brave-border rounded-lg p-3 space-y-3">
+                    <p class="text-[11px] text-gray-400">Opcional: pregunta secreta para recuperar tu cuenta si olvidas la clave.</p>
+                    <select id="modalRegPregunta" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                        <option value="">Sin pregunta secreta</option>
+                        <option>¿Cuál es el nombre de tu primera mascota?</option>
+                        <option>¿En qué ciudad naciste?</option>
+                        <option>¿Cuál es tu comida favorita?</option>
+                        <option>¿Cómo se llamaba tu mejor amigo de la infancia?</option>
+                        <option>¿Cuál es el nombre de tu madre?</option>
+                    </select>
+                    <input type="text" id="modalRegRespuesta" placeholder="Tu respuesta" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
                 <button type="submit" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Crear mi cuenta</button>
             </form>
+
+            <!-- Formulario: recuperar clave -->
+            <div id="formRecuperar" class="space-y-4 hidden">
+                <p class="text-xs text-gray-400">Recupera tu cuenta por código de correo o por pregunta secreta.</p>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Tu correo</label>
+                    <input type="email" id="recEmail" autocomplete="email" placeholder="tucorreo@ejemplo.com" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                </div>
+
+                <div id="recPaso1" class="space-y-2">
+                    <button type="button" onclick="recuperarPorCodigo()" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Enviar código por correo</button>
+                    <button type="button" onclick="recuperarPorPregunta()" class="w-full border border-brave-border text-gray-300 font-bold py-2.5 rounded-xl text-sm transition">Usar pregunta secreta</button>
+                </div>
+
+                <div id="recPaso2" class="space-y-3 hidden">
+                    <label class="block text-xs text-gray-400 mb-1">Escribe el código de 6 cifras</label>
+                    <input type="text" id="recCodigo" inputmode="numeric" maxlength="6" placeholder="000000" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm text-center tracking-widest focus:outline-none focus:border-brave-orange">
+                    <button type="button" onclick="recuperarVerificarCodigo()" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Verificar código</button>
+                </div>
+
+                <div id="recPasoPregunta" class="space-y-3 hidden">
+                    <label class="block text-xs text-gray-400 mb-1">Pregunta secreta</label>
+                    <p id="recPreguntaTexto" class="text-sm text-white font-semibold">---</p>
+                    <input type="text" id="recRespuesta" placeholder="Tu respuesta" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                    <button type="button" onclick="recuperarResponder()" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Comprobar respuesta</button>
+                </div>
+
+                <div id="recPaso3" class="space-y-3 hidden">
+                    <label class="block text-xs text-gray-400 mb-1">Nueva clave</label>
+                    <input type="password" id="recNuevaClave" minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                    <input type="password" id="recNuevaClave2" minlength="6" autocomplete="new-password" placeholder="Repite la clave" class="w-full bg-brave-dark border border-brave-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brave-orange">
+                    <button type="button" onclick="recuperarCambiarClave()" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 text-white font-bold py-2.5 rounded-xl text-sm transition">Guardar nueva clave</button>
+                </div>
+
+                <button type="button" onclick="cambiarPestana('entrar')" class="w-full text-center text-xs text-gray-500 hover:text-white">Volver a Entrar</button>
+            </div>
         </div>
     </div>
 
@@ -351,6 +400,39 @@
         let currentTargetUrl = "";
         let countdownTimer = null;
 
+        // Administradores. Sirven de respaldo cuando la web corre sin servidor
+        // (GitHub Pages / IPFS). Con servidor manda TAKTAK_ADMIN + TAKTAK_ADMIN_CLAVE.
+        const ADMIN_EMAILS = ['eliecerdepablos@gmail.com', 'taktak.messenger@gmail.com'];
+        const ADMIN_CLAVE_HASH = '7506ae4669d5f7ec6783c979feaa5b60d835e530a8cb5c212174c2e16c966f1d';
+
+        async function claveAdminValidaLocal(correo, clave) {
+            if (ADMIN_EMAILS.indexOf((correo || '').trim().toLowerCase()) === -1) return false;
+            if (!(window.crypto && crypto.subtle)) return false;
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(clave));
+            const hex = Array.from(new Uint8Array(buf))
+                .map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+            return hex === ADMIN_CLAVE_HASH;
+        }
+
+        function bannersLocalLeer() {
+            try { return JSON.parse(localStorage.getItem('taktak_banners') || '[]'); }
+            catch (e) { return []; }
+        }
+
+        function bannersLocalGuardar(lista) {
+            localStorage.setItem('taktak_banners', JSON.stringify(lista));
+        }
+
+        function entrarComoAdmin() {
+            isAdminLoggedIn = true;
+            localStorage.setItem('taktak_admin_local', '1');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            document.getElementById('adminBtnText').innerText = 'Admin Activo';
+            document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
+            renderAdminBanners();
+            cargarTicketsAdmin();
+        }
+
         async function api(ruta, opciones) {
             const conf = Object.assign({ headers: {} }, opciones || {});
             conf.headers['Content-Type'] = 'application/json';
@@ -374,6 +456,7 @@
                 }
             } catch (e) {
                 servidorActivo = false;
+                banners = bannersLocalLeer();
                 if (badge) {
                     badge.textContent = 'Modo demostracion (sin servidor)';
                     badge.className = 'text-[10px] text-yellow-500';
@@ -408,23 +491,30 @@
             e.preventDefault();
             const email = document.getElementById('adminEmailInput').value.trim();
             const clave = document.getElementById('adminClaveInput').value;
-            try {
-                const datos = await api(API + '/api/admin/login', {
-                    method: 'POST',
-                    body: JSON.stringify({ correo: email, clave: clave })
-                });
-                claveAdmin = datos.clave;
-                localStorage.setItem('taktak_admin_clave', claveAdmin);
-                isAdminLoggedIn = true;
-                document.getElementById('adminPanel').classList.remove('hidden');
-                document.getElementById('adminBtnText').innerText = 'Admin Activo';
-                document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
-                toggleAdminModal();
+            if (servidorActivo) {
+                try {
+                    const datos = await api(API + '/api/admin/login', {
+                        method: 'POST',
+                        body: JSON.stringify({ correo: email, clave: clave })
+                    });
+                    claveAdmin = datos.clave;
+                    localStorage.setItem('taktak_admin_clave', claveAdmin);
+                    document.getElementById('adminClaveInput').value = '';
+                    entrarComoAdmin();
+                    toggleAdminModal();
+                    return;
+                } catch (err) {
+                    alert('Acceso denegado: ' + err.message);
+                    return;
+                }
+            }
+            // Sin servidor: se valida en el navegador (respaldo).
+            if (await claveAdminValidaLocal(email, clave)) {
                 document.getElementById('adminClaveInput').value = '';
-                renderAdminBanners();
-                cargarTicketsAdmin();
-            } catch (err) {
-                alert('Acceso denegado: ' + err.message);
+                entrarComoAdmin();
+                toggleAdminModal();
+            } else {
+                alert('Acceso denegado: correo o clave incorrectos.');
             }
         }
 
@@ -432,6 +522,7 @@
             isAdminLoggedIn = false;
             claveAdmin = '';
             localStorage.removeItem('taktak_admin_clave');
+            localStorage.removeItem('taktak_admin_local');
             document.getElementById('adminPanel').classList.add('hidden');
             document.getElementById('adminBtnText').innerText = 'Acceso Admin';
             document.getElementById('adminAuthBtn').classList.remove('bg-purple-600', 'text-white');
@@ -465,32 +556,151 @@
         function cambiarPestana(cual) {
             const entrar = document.getElementById('formEntrar');
             const registrar = document.getElementById('formRegistrar');
+            const recup = document.getElementById('formRecuperar');
             const tabE = document.getElementById('tabEntrar');
             const tabR = document.getElementById('tabRegistrar');
             const activo = 'flex-1 py-2 rounded-lg text-xs font-bold transition bg-brave-orange text-white';
             const inactivo = 'flex-1 py-2 rounded-lg text-xs font-bold transition text-gray-400';
+            entrar.classList.add('hidden');
+            registrar.classList.add('hidden');
+            recup.classList.add('hidden');
             if (cual === 'registrar') {
-                entrar.classList.add('hidden'); registrar.classList.remove('hidden');
+                registrar.classList.remove('hidden');
                 tabR.className = activo; tabE.className = inactivo;
+            } else if (cual === 'recuperar') {
+                recup.classList.remove('hidden');
+                tabE.className = inactivo; tabR.className = inactivo;
+                recuperarReiniciar();
             } else {
-                registrar.classList.add('hidden'); entrar.classList.remove('hidden');
+                entrar.classList.remove('hidden');
                 tabE.className = activo; tabR.className = inactivo;
             }
         }
 
-        async function registrarUsuario(email, clave) {
+        // ---------------- RECUPERACIÓN DE CUENTA ----------------
+        let recToken = '';
+
+        function recuperarReiniciar() {
+            recToken = '';
+            ['recPaso1', 'recPaso2', 'recPasoPregunta', 'recPaso3'].forEach(function (id) {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById('recPaso1').classList.remove('hidden');
+            document.getElementById('recCodigo').value = '';
+            document.getElementById('recRespuesta').value = '';
+            document.getElementById('recNuevaClave').value = '';
+            document.getElementById('recNuevaClave2').value = '';
+        }
+
+        function recCorreo() {
+            const email = document.getElementById('recEmail').value.trim().toLowerCase();
+            if (!email) { alert('Escribe tu correo primero.'); return ''; }
+            return email;
+        }
+
+        async function recuperarPorCodigo() {
+            const email = recCorreo();
+            if (!email) return;
+            if (!servidorActivo) {
+                alert('La recuperación por correo necesita el servidor. Usa la pregunta secreta o espera la versión con servidor.');
+                return;
+            }
+            try {
+                await api(API + '/api/recuperar/codigo', { method: 'POST', body: JSON.stringify({ correo: email }) });
+                document.getElementById('recPaso1').classList.add('hidden');
+                document.getElementById('recPaso2').classList.remove('hidden');
+                alert('Si ese correo está registrado, recibirás un código de 6 cifras. Revisa tu correo.');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function recuperarVerificarCodigo() {
+            const email = recCorreo();
+            if (!email) return;
+            const codigo = document.getElementById('recCodigo').value.trim();
+            if (!codigo) { alert('Escribe el código.'); return; }
+            try {
+                const d = await api(API + '/api/recuperar/verificar', { method: 'POST', body: JSON.stringify({ correo: email, codigo: codigo }) });
+                recToken = d.token;
+                document.getElementById('recPaso2').classList.add('hidden');
+                document.getElementById('recPaso3').classList.remove('hidden');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function recuperarPorPregunta() {
+            const email = recCorreo();
+            if (!email) return;
+            if (!servidorActivo) {
+                alert('La pregunta secreta necesita el servidor.');
+                return;
+            }
+            try {
+                const d = await api(API + '/api/recuperar/pregunta', { method: 'POST', body: JSON.stringify({ correo: email }) });
+                document.getElementById('recPreguntaTexto').innerText = d.pregunta;
+                document.getElementById('recPaso1').classList.add('hidden');
+                document.getElementById('recPasoPregunta').classList.remove('hidden');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function recuperarResponder() {
+            const email = recCorreo();
+            if (!email) return;
+            const respuesta = document.getElementById('recRespuesta').value;
+            if (!respuesta) { alert('Escribe tu respuesta.'); return; }
+            try {
+                const d = await api(API + '/api/recuperar/responder', { method: 'POST', body: JSON.stringify({ correo: email, respuesta: respuesta }) });
+                recToken = d.token;
+                document.getElementById('recPasoPregunta').classList.add('hidden');
+                document.getElementById('recPaso3').classList.remove('hidden');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function recuperarCambiarClave() {
+            const clave = document.getElementById('recNuevaClave').value;
+            const clave2 = document.getElementById('recNuevaClave2').value;
+            if (clave.length < 6) { alert('La clave debe tener al menos 6 caracteres.'); return; }
+            if (clave !== clave2) { alert('Las dos claves no coinciden.'); return; }
+            if (!recToken) { alert('Vuelve a empezar la recuperación.'); return; }
+            try {
+                const d = await api(API + '/api/recuperar/cambiar', { method: 'POST', body: JSON.stringify({ token: recToken, clave: clave }) });
+                usuarioActual = d.correo;
+                localStorage.setItem('taktak_usuario', usuarioActual);
+                pintarUsuario();
+                cerrarAcceso();
+                alert('¡Listo! Tu clave se cambió y ya estás dentro.');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function registrarUsuario(email, clave, pregunta, respuesta) {
             if (servidorActivo) {
                 const datos = await api(API + '/api/usuarios/registro', {
                     method: 'POST',
                     body: JSON.stringify({ correo: email, clave: clave })
                 });
                 usuarioActual = datos.correo || email;
+                if (pregunta && respuesta) {
+                    try {
+                        await api(API + '/api/usuarios/pregunta', {
+                            method: 'POST',
+                            body: JSON.stringify({ correo: email, clave: clave, pregunta: pregunta, respuesta: respuesta })
+                        });
+                    } catch (e) { /* la cuenta ya está creada; la pregunta es opcional */ }
+                }
             } else {
                 // Sin servidor: se guarda localmente (demostración)
                 let usuarios = {};
                 try { usuarios = JSON.parse(localStorage.getItem('taktak_usuarios') || '{}'); } catch (e) { usuarios = {}; }
                 if (usuarios[email]) throw new Error('Ese correo ya está registrado.');
-                usuarios[email] = clave;
+                usuarios[email] = { clave: clave, pregunta: pregunta || '', respuesta: respuesta || '' };
                 localStorage.setItem('taktak_usuarios', JSON.stringify(usuarios));
                 usuarioActual = email;
             }
@@ -508,7 +718,9 @@
             } else {
                 let usuarios = {};
                 try { usuarios = JSON.parse(localStorage.getItem('taktak_usuarios') || '{}'); } catch (e) { usuarios = {}; }
-                if (usuarios[email] !== clave) throw new Error('Correo o clave incorrectos.');
+                const u = usuarios[email];
+                const guardada = (u && typeof u === 'object') ? u.clave : u;
+                if (guardada !== clave) throw new Error('Correo o clave incorrectos.');
                 usuarioActual = email;
             }
             localStorage.setItem('taktak_usuario', usuarioActual);
@@ -541,10 +753,14 @@
             e.preventDefault();
             const email = document.getElementById('modalRegEmail').value.trim().toLowerCase();
             const clave = document.getElementById('modalRegClave').value;
+            const pregunta = document.getElementById('modalRegPregunta').value;
+            const respuesta = document.getElementById('modalRegRespuesta').value.trim();
             if (clave.length < 6) { alert('La clave debe tener al menos 6 caracteres.'); return; }
+            if (pregunta && !respuesta) { alert('Escribe la respuesta de tu pregunta secreta.'); return; }
             try {
-                await registrarUsuario(email, clave);
+                await registrarUsuario(email, clave, pregunta, respuesta);
                 document.getElementById('modalRegClave').value = '';
+                document.getElementById('modalRegRespuesta').value = '';
                 cerrarAcceso();
                 alert('¡Cuenta creada! Bienvenido a TakTak.brave.');
             } catch (err) {
@@ -576,34 +792,47 @@
 
         async function handleAddBanner(e) {
             e.preventDefault();
-            try {
-                const datos = await api(API + '/api/admin/banners', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        titulo: document.getElementById('adTitle').value,
-                        imagen: document.getElementById('adImageUrl').value,
-                        destino: document.getElementById('adTargetUrl').value
-                    })
-                });
-                banners = datos.banners;
-                renderAdminBanners();
-                e.target.reset();
-            } catch (err) {
-                alert(err.message);
+            const titulo = document.getElementById('adTitle').value;
+            const imagen = document.getElementById('adImageUrl').value;
+            const destino = document.getElementById('adTargetUrl').value;
+            if (servidorActivo) {
+                try {
+                    const datos = await api(API + '/api/admin/banners', {
+                        method: 'POST',
+                        body: JSON.stringify({ titulo: titulo, imagen: imagen, destino: destino })
+                    });
+                    banners = datos.banners;
+                    renderAdminBanners();
+                    e.target.reset();
+                } catch (err) {
+                    alert(err.message);
+                }
+                return;
             }
+            banners = bannersLocalLeer();
+            banners.push({ id: 'b' + Date.now(), titulo: titulo, imagen: imagen, destino: destino });
+            bannersLocalGuardar(banners);
+            renderAdminBanners();
+            e.target.reset();
         }
 
         async function deleteBanner(id) {
-            try {
-                const datos = await api(API + '/api/admin/borrar', {
-                    method: 'POST',
-                    body: JSON.stringify({ id: id })
-                });
-                banners = datos.banners;
-                renderAdminBanners();
-            } catch (err) {
-                alert(err.message);
+            if (servidorActivo) {
+                try {
+                    const datos = await api(API + '/api/admin/borrar', {
+                        method: 'POST',
+                        body: JSON.stringify({ id: id })
+                    });
+                    banners = datos.banners;
+                    renderAdminBanners();
+                } catch (err) {
+                    alert(err.message);
+                }
+                return;
             }
+            banners = bannersLocalLeer().filter(function (b) { return String(b.id) !== String(id); });
+            bannersLocalGuardar(banners);
+            renderAdminBanners();
         }
 
         async function handleShorten(e) {
@@ -915,16 +1144,13 @@
             setInterval(function () { if (servidorActivo) cargarLoteria(); }, 15000);
             if (claveAdmin) {
                 api(API + '/api/enlaces').then(function () {
-                    isAdminLoggedIn = true;
-                    document.getElementById('adminPanel').classList.remove('hidden');
-                    document.getElementById('adminBtnText').innerText = 'Admin Activo';
-                    document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
-                    renderAdminBanners();
-                    cargarTicketsAdmin();
+                    entrarComoAdmin();
                 }).catch(function () {
                     claveAdmin = '';
                     localStorage.removeItem('taktak_admin_clave');
                 });
+            } else if (localStorage.getItem('taktak_admin_local') === '1') {
+                entrarComoAdmin();
             }
         });
     </script>

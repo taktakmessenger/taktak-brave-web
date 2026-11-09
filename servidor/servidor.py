@@ -6,8 +6,11 @@ SQLite y sirve la web, la API y una pagina de anuncio de 3 s antes de redirigir.
 Variables de entorno:
     PUERTO / PORT   puerto (por defecto 8080)
     TAKTAK_DB       ruta del fichero SQLite
-    TAKTAK_ADMIN    correo del administrador
+    TAKTAK_ADMIN    correo(s) del administrador, separados por comas
     TAKTAK_ADMIN_CLAVE  clave del administrador (obligatoria para entrar)
+    TAKTAK_SECRETO  firma los enlaces de recuperación (si falta, usa la clave admin)
+    GMAIL_USER      cuenta de Gmail que manda los códigos
+    GMAIL_APP_PASSWORD  contraseña de aplicación de Gmail (no la normal)
     MAX_BANNERS     maximo de banners (20)
     MAX_DIAS        dias de conservacion de enlaces (365)
     TOPE_POR_HORA   enlaces por IP y hora (10)
@@ -16,16 +19,20 @@ Variables de entorno:
     LOTERIA_BASE    pozo base en BAT (demo, 5.0)
 """
 import hashlib
+import hmac
 import json
 import os
 import random
 import re
 import secrets
+import smtplib
 import sqlite3
 import string
 import sys
 import threading
 import time
+import unicodedata
+from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -105,8 +112,27 @@ def preparar_bd():
             clave   TEXT NOT NULL,
             creado  INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS recuperaciones (
+            correo   TEXT NOT NULL,
+            codigo   TEXT NOT NULL,
+            sal      TEXT NOT NULL,
+            expira   INTEGER NOT NULL,
+            intentos INTEGER NOT NULL DEFAULT 0,
+            usado    INTEGER NOT NULL DEFAULT 0,
+            creado   INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_rec_correo ON recuperaciones (correo, creado);
         """
     )
+    con.commit()
+    # Migracion: columnas de la pregunta secreta (bases ya creadas).
+    columnas = {f[1] for f in con.execute("PRAGMA table_info(usuarios)")}
+    if "pregunta" not in columnas:
+        con.execute("ALTER TABLE usuarios ADD COLUMN pregunta TEXT")
+    if "respuesta_sal" not in columnas:
+        con.execute("ALTER TABLE usuarios ADD COLUMN respuesta_sal TEXT")
+    if "respuesta" not in columnas:
+        con.execute("ALTER TABLE usuarios ADD COLUMN respuesta TEXT")
     con.commit()
     con.close()
 
@@ -169,12 +195,18 @@ def _hash_clave(clave, sal):
     return hashlib.pbkdf2_hmac("sha256", clave.encode("utf-8"), bytes.fromhex(sal), 120_000).hex()
 
 
+def admins():
+    """Correos de administrador (varios, separados por comas)."""
+    bruto = os.environ.get("TAKTAK_ADMIN") or "taktak.messenger@gmail.com"
+    lista = [c.strip().lower() for c in bruto.split(",") if c.strip()]
+    return lista or ["taktak.messenger@gmail.com"]
+
+
 def clave_valida(correo, clave):
     """Comprueba correo+clave. El admin se valida con TAKTAK_ADMIN_CLAVE."""
     correo = (correo or "").strip().lower()
     clave = clave or ""
-    admin = (os.environ.get("TAKTAK_ADMIN") or "taktak.messenger@gmail.com").lower()
-    if correo == admin:
+    if correo in admins():
         esperada = os.environ.get("TAKTAK_ADMIN_CLAVE") or ""
         return bool(esperada) and secrets.compare_digest(clave, esperada)
     con = _bd()
@@ -203,6 +235,186 @@ def crear_usuario(correo, clave):
     con.commit()
     con.close()
     return None
+
+
+def normalizar_respuesta(texto):
+    """Sin tildes, sin mayusculas, sin espacios de sobra."""
+    texto = unicodedata.normalize("NFKD", texto or "")
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    return " ".join(texto.lower().split())
+
+
+def guardar_pregunta(correo, pregunta, respuesta):
+    correo = (correo or "").strip().lower()
+    pregunta = (pregunta or "").strip()
+    respuesta = normalizar_respuesta(respuesta)
+    if not pregunta:
+        return "Elige una pregunta secreta"
+    if len(respuesta) < 2:
+        return "La respuesta es muy corta"
+    sal = secrets.token_hex(16)
+    con = _bd()
+    fila = con.execute("SELECT 1 FROM usuarios WHERE correo=?", (correo,)).fetchone()
+    if not fila:
+        con.close()
+        return "Ese correo no está registrado"
+    con.execute("UPDATE usuarios SET pregunta=?, respuesta_sal=?, respuesta=? WHERE correo=?",
+                (pregunta, sal, _hash_clave(respuesta, sal), correo))
+    con.commit()
+    con.close()
+    return None
+
+
+def pregunta_de(correo):
+    correo = (correo or "").strip().lower()
+    con = _bd()
+    fila = con.execute("SELECT pregunta FROM usuarios WHERE correo=?", (correo,)).fetchone()
+    con.close()
+    if not fila or not fila["pregunta"]:
+        return None
+    return fila["pregunta"]
+
+
+def respuesta_valida(correo, respuesta):
+    correo = (correo or "").strip().lower()
+    con = _bd()
+    fila = con.execute("SELECT respuesta_sal, respuesta FROM usuarios WHERE correo=?", (correo,)).fetchone()
+    con.close()
+    if not fila or not fila["respuesta"]:
+        return False
+    return secrets.compare_digest(_hash_clave(normalizar_respuesta(respuesta), fila["respuesta_sal"]),
+                                  fila["respuesta"])
+
+
+def borrar_sesiones_de(correo):
+    con = _bd()
+    con.execute("DELETE FROM sesiones WHERE correo=?", ((correo or "").strip().lower(),))
+    con.commit()
+    con.close()
+
+
+def cambiar_clave(correo, clave):
+    correo = (correo or "").strip().lower()
+    clave = clave or ""
+    if len(clave) < 6:
+        return "La clave debe tener al menos 6 caracteres"
+    sal = secrets.token_hex(16)
+    con = _bd()
+    con.execute("UPDATE usuarios SET sal=?, clave=? WHERE correo=?",
+                (sal, _hash_clave(clave, sal), correo))
+    con.commit()
+    con.close()
+    borrar_sesiones_de(correo)
+    return None
+
+
+def _enviar_correo(destino, asunto, cuerpo):
+    """Manda el correo por Gmail. Sin configurar devuelve False y no miente."""
+    usuario = os.environ.get("GMAIL_USER") or ""
+    clave = os.environ.get("GMAIL_APP_PASSWORD") or ""
+    if not usuario or not clave:
+        print(f"[correo] Sin GMAIL_USER/GMAIL_APP_PASSWORD. Para {destino}: {cuerpo}", flush=True)
+        return False
+    msg = EmailMessage()
+    msg["From"] = usuario
+    msg["To"] = destino
+    msg["Subject"] = asunto
+    msg.set_content(cuerpo)
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as s:
+            s.login(usuario, clave)
+            s.send_message(msg)
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"[correo] Fallo al enviar a {destino}: {e}", flush=True)
+        return False
+
+
+def pedir_codigo(correo):
+    """Genera y manda un codigo de 6 cifras. Nunca revela si el correo existe."""
+    correo = (correo or "").strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", correo):
+        return "Escribe un correo válido"
+    con = _bd()
+    existe = con.execute("SELECT 1 FROM usuarios WHERE correo=?", (correo,)).fetchone()
+    ahora = int(time.time())
+    # El tope se aplica exista o no la cuenta: la respuesta es la misma en los dos
+    # casos, asi que no delata nada y ademas evita llenar la base.
+    recientes = con.execute(
+        "SELECT COUNT(*) FROM recuperaciones WHERE correo=? AND creado>?",
+        (correo, ahora - 3600)).fetchone()[0]
+    con.execute("DELETE FROM recuperaciones WHERE creado<?", (ahora - 86400,))
+    if recientes >= 3:
+        con.commit()
+        con.close()
+        return "Ya pediste varios códigos. Espera una hora."
+    codigo = f"{secrets.randbelow(1000000):06d}"
+    sal = secrets.token_hex(16)
+    con.execute("INSERT INTO recuperaciones (correo, codigo, sal, expira, intentos, usado, creado) "
+                "VALUES (?,?,?,?,0,0,?)",
+                (correo, _hash_clave(codigo, sal), sal, ahora + 900, ahora))
+    con.commit()
+    con.close()
+    if existe:
+        _enviar_correo(correo, "Tu código para recuperar la cuenta TakTak",
+                       f"Tu código es {codigo}. Vale 15 minutos. Si no lo pediste, ignora este mensaje.")
+    return None
+
+
+def verificar_codigo(correo, codigo):
+    """Devuelve (ok, error). Un código vale una sola vez y 5 intentos."""
+    correo = (correo or "").strip().lower()
+    codigo = (codigo or "").strip()
+    con = _bd()
+    fila = con.execute(
+        "SELECT rowid, codigo, sal, expira, intentos, usado FROM recuperaciones "
+        "WHERE correo=? AND usado=0 ORDER BY creado DESC LIMIT 1", (correo,)).fetchone()
+    if not fila:
+        con.close()
+        return False, "No hay un código pendiente. Pide uno nuevo."
+    if fila["expira"] < int(time.time()):
+        con.close()
+        return False, "El código caducó. Pide uno nuevo."
+    if fila["intentos"] >= 5:
+        con.close()
+        return False, "Demasiados intentos. Pide un código nuevo."
+    if not secrets.compare_digest(_hash_clave(codigo, fila["sal"]), fila["codigo"]):
+        con.execute("UPDATE recuperaciones SET intentos=intentos+1 WHERE rowid=?", (fila["rowid"],))
+        con.commit()
+        con.close()
+        return False, "Código incorrecto."
+    con.execute("UPDATE recuperaciones SET usado=1 WHERE rowid=?", (fila["rowid"],))
+    con.commit()
+    con.close()
+    return True, None
+
+
+def _clave_secreta():
+    return (os.environ.get("TAKTAK_SECRETO") or os.environ.get("TAKTAK_ADMIN_CLAVE")
+            or "taktak-brave-cambia-esto").encode("utf-8")
+
+
+def firmar_token(correo, minutos=20):
+    """Token temporal para cambiar la clave tras verificar identidad."""
+    expira = int(time.time()) + minutos * 60
+    cuerpo = f"{correo}|{expira}"
+    firma = hmac.new(_clave_secreta(), cuerpo.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+    return f"{cuerpo}|{firma}"
+
+
+def verificar_token(token):
+    """Devuelve el correo si el token es válido y no ha caducado."""
+    partes = (token or "").split("|")
+    if len(partes) != 3:
+        return None
+    correo, expira, firma = partes
+    cuerpo = f"{correo}|{expira}"
+    esperada = hmac.new(_clave_secreta(), cuerpo.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+    if not secrets.compare_digest(firma, esperada):
+        return None
+    if int(expira) < time.time():
+        return None
+    return correo
 
 
 # --------------------------------------------------------------------------- #
@@ -504,6 +716,44 @@ class Manejador(BaseHTTPRequestHandler):
             if not clave_valida(correo, datos.get("clave")):
                 return self._json({"error": "correo o clave incorrectos"}, 401)
             return self._json({"ok": True, "correo": correo})
+        if ruta == "/api/usuarios/pregunta":
+            correo = (datos.get("correo") or "").strip().lower()
+            if not clave_valida(correo, datos.get("clave")):
+                return self._json({"error": "correo o clave incorrectos"}, 401)
+            error = guardar_pregunta(correo, datos.get("pregunta"), datos.get("respuesta"))
+            if error:
+                return self._json({"error": error}, 400)
+            return self._json({"ok": True})
+        if ruta == "/api/recuperar/codigo":
+            error = pedir_codigo(datos.get("correo"))
+            if error:
+                return self._json({"error": error}, 400)
+            # Anti-enumeracion: misma respuesta exista o no el correo.
+            return self._json({"ok": True, "mensaje": "Si el correo está registrado, recibirás un código."})
+        if ruta == "/api/recuperar/verificar":
+            ok, error = verificar_codigo(datos.get("correo"), datos.get("codigo"))
+            if not ok:
+                return self._json({"error": error}, 400)
+            correo = (datos.get("correo") or "").strip().lower()
+            return self._json({"ok": True, "token": firmar_token(correo)})
+        if ruta == "/api/recuperar/pregunta":
+            pregunta = pregunta_de(datos.get("correo"))
+            if not pregunta:
+                return self._json({"error": "Esa cuenta no tiene pregunta secreta."}, 404)
+            return self._json({"pregunta": pregunta})
+        if ruta == "/api/recuperar/responder":
+            correo = (datos.get("correo") or "").strip().lower()
+            if not respuesta_valida(correo, datos.get("respuesta")):
+                return self._json({"error": "Respuesta incorrecta."}, 400)
+            return self._json({"ok": True, "token": firmar_token(correo)})
+        if ruta == "/api/recuperar/cambiar":
+            correo = verificar_token(datos.get("token"))
+            if not correo:
+                return self._json({"error": "Enlace caducado. Vuelve a empezar."}, 400)
+            error = cambiar_clave(correo, datos.get("clave"))
+            if error:
+                return self._json({"error": error}, 400)
+            return self._json({"ok": True, "correo": correo})
         if ruta == "/api/admin/banners":
             return self._guardar_banner(datos)
         if ruta == "/api/admin/borrar":
@@ -596,8 +846,7 @@ class Manejador(BaseHTTPRequestHandler):
     def _login(self, datos):
         correo = (datos.get("correo") or "").strip().lower()
         clave = datos.get("clave") or ""
-        admin = (os.environ.get("TAKTAK_ADMIN") or "taktak.messenger@gmail.com").lower()
-        if correo != admin or not clave_valida(correo, clave):
+        if correo not in admins() or not clave_valida(correo, clave):
             return self._json({"error": "correo o clave incorrectos"}, 401)
         clave_sesion = secrets.token_urlsafe(24)
         con = _bd()
