@@ -49,7 +49,10 @@
                 <button id="userAuthBtn" onclick="abrirAcceso()" class="min-h-[44px] px-3 py-2 rounded-lg border border-brave-orange/40 text-brave-orange hover:bg-brave-orange/10 text-xs font-semibold flex items-center gap-2 transition">
                     <i class="fa-solid fa-right-to-bracket"></i> <span id="userBtnText">Entrar / Registrarse</span>
                 </button>
-                <button id="adminAuthBtn" onclick="toggleAdminModal()" class="min-h-[44px] px-3 py-2 rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 text-xs font-semibold flex items-center gap-2 transition">
+                <button id="logoutUserBtn" onclick="cerrarSesion()" class="hidden min-h-[44px] px-3 py-2 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-semibold flex items-center gap-2 transition">
+                    <i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión
+                </button>
+                <button id="adminAuthBtn" onclick="adminBtnClick()" class="min-h-[44px] px-3 py-2 rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 text-xs font-semibold flex items-center gap-2 transition">
                     <i class="fa-solid fa-lock"></i> <span id="adminBtnText">Acceso Admin</span>
                 </button>
                 <button id="walletBtn" onclick="connectWallet()" class="min-h-[44px] px-4 py-2 rounded-xl bg-brave-orange hover:bg-orange-600 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-brave-orange/20 transition">
@@ -438,7 +441,7 @@
             if (adminEmail) localStorage.setItem('taktak_admin_email', adminEmail);
             localStorage.setItem('taktak_admin_local', '1');
             document.getElementById('adminPanel').classList.remove('hidden');
-            document.getElementById('adminBtnText').innerText = 'Admin Activo';
+            document.getElementById('adminBtnText').innerText = 'Salir de Admin';
             document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
             const quien = document.getElementById('adminQuien');
             if (quien) quien.innerText = adminEmail ? ('Sesión: ' + adminEmail) : '';
@@ -505,6 +508,14 @@
             document.getElementById('adminModal').classList.toggle('hidden');
         }
 
+        function adminBtnClick() {
+            if (isAdminLoggedIn) {
+                if (confirm('¿Cerrar la sesión de administrador?')) logoutAdmin();
+            } else {
+                toggleAdminModal();
+            }
+        }
+
         async function handleAdminLogin(e) {
             e.preventDefault();
             const email = document.getElementById('adminEmailInput').value.trim();
@@ -560,15 +571,21 @@
         function pintarUsuario() {
             const zona = document.getElementById('zonaUsuario');
             const btnTxt = document.getElementById('userBtnText');
+            const btnEntrar = document.getElementById('userAuthBtn');
+            const btnSalir = document.getElementById('logoutUserBtn');
             if (usuarioActual) {
                 if (zona) {
                     zona.classList.remove('hidden');
                     document.getElementById('usuarioLogueado').innerText = usuarioActual;
                 }
                 if (btnTxt) btnTxt.innerText = usuarioActual.split('@')[0];
+                if (btnEntrar) btnEntrar.classList.add('hidden');
+                if (btnSalir) btnSalir.classList.remove('hidden');
             } else {
                 if (zona) zona.classList.add('hidden');
                 if (btnTxt) btnTxt.innerText = 'Entrar / Registrarse';
+                if (btnEntrar) btnEntrar.classList.remove('hidden');
+                if (btnSalir) btnSalir.classList.add('hidden');
             }
         }
 
