@@ -13,6 +13,21 @@ web, muestra una **página de anuncio de 3 segundos** y luego redirige.
 - `POST /api/admin/banners` — añade un banner (requiere clave).
 - `POST /api/admin/borrar` — borra un banner (requiere clave).
 
+## Lotería (DEMO)
+
+> ⚠️ **Demostración sin dinero real.** El pozo, los tickets y el sorteo se
+> guardan de verdad en el servidor y los ven todos los usuarios, pero **no se
+> cobra ni se paga ningún token**. Sirve para mostrar cómo funcionará la
+> "Lotería Cripto" antes de abrirla de verdad.
+
+- `GET /api/loteria` — estado de hoy (pozo, tickets, próximo sorteo, ganador).
+- `POST /api/loteria/comprar` — registra un ticket `{numero, wallet}`.
+- `GET /api/loteria/tickets?wallet=0x...` — tus tickets (el admin ve todos).
+- `POST /api/loteria/sortear` — sortea el ganador del día (requiere clave, 1 vez/día).
+
+Reparto (igual que se mostró al usuario): **80 %** del precio va al pozo,
+**20 %** se reserva para administración.
+
 ## Cómo funciona ahora
 
 ```

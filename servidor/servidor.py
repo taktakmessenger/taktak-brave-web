@@ -11,6 +11,8 @@ Variables de entorno:
     MAX_DIAS        dias de conservacion de enlaces (365)
     TOPE_POR_HORA   enlaces por IP y hora (10)
     SESION_HORAS    duracion de la sesion de admin (12)
+    LOTERIA_PRECIO  precio del ticket en BAT (demo, 1.0)
+    LOTERIA_BASE    pozo base en BAT (demo, 5.0)
 """
 import json
 import os
@@ -36,6 +38,12 @@ MAX_BANNERS = int(os.environ.get("MAX_BANNERS") or 20)
 MAX_DIAS = int(os.environ.get("MAX_DIAS") or 365)
 TOPE_POR_HORA = int(os.environ.get("TOPE_POR_HORA") or 10)
 SESION_HORAS = int(os.environ.get("SESION_HORAS") or 12)
+
+# Lotería (DEMO). No se cobra ni se paga nada: son cifras de demostración.
+LOTERIA_PRECIO = float(os.environ.get("LOTERIA_PRECIO") or 1.0)   # BAT por ticket (demo)
+LOTERIA_BASE = float(os.environ.get("LOTERIA_BASE") or 5.0)       # pozo base (demo)
+LOTERIA_POZO_PCT = 0.8    # 80% del ticket va al pozo
+LOTERIA_ADMIN_PCT = 0.2   # 20% reservado para administración
 
 NOMBRE_ARCHIVO = re.compile(r"^[a-zA-Z0-9._-]+$")
 CONTADOR = {}
@@ -73,6 +81,20 @@ def preparar_bd():
         CREATE TABLE IF NOT EXISTS sesiones (
             clave  TEXT PRIMARY KEY,
             correo TEXT NOT NULL,
+            creado INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS loterias (
+            fecha           TEXT PRIMARY KEY,
+            sorteado        INTEGER NOT NULL DEFAULT 0,
+            ganador_numero  TEXT,
+            ganador_wallet  TEXT,
+            sorteado_en     INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS tickets (
+            id     INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha  TEXT NOT NULL,
+            numero TEXT NOT NULL,
+            wallet TEXT NOT NULL,
             creado INTEGER NOT NULL
         );
         """
@@ -232,6 +254,107 @@ h1{color:#FF5500;font-size:52px;margin:0}p{color:#9ca3af}a{color:#FF5500}</style
 
 
 # --------------------------------------------------------------------------- #
+# Lotería (DEMO) — el pozo y los tickets se guardan de verdad en SQLite, pero
+# NO se cobra ni se paga ningún token: son cifras de demostración.
+# --------------------------------------------------------------------------- #
+def hoy():
+    return time.strftime("%Y-%m-%d", time.localtime())
+
+
+def proximo_sorteo():
+    """Marca de tiempo de la próxima medianoche UTC (fin del sorteo de hoy)."""
+    return (int(time.time() // 86400) + 1) * 86400
+
+
+def loteria_estado():
+    fecha = hoy()
+    con = _bd()
+    fila = con.execute("SELECT * FROM loterias WHERE fecha=?", (fecha,)).fetchone()
+    total = con.execute("SELECT COUNT(*) AS n FROM tickets WHERE fecha=?", (fecha,)).fetchone()["n"]
+    con.close()
+    estado = {
+        "fecha": fecha,
+        "precio": LOTERIA_PRECIO,
+        "pozo": round(LOTERIA_BASE + total * LOTERIA_PRECIO * LOTERIA_POZO_PCT, 2),
+        "admin": round(total * LOTERIA_PRECIO * LOTERIA_ADMIN_PCT, 2),
+        "tickets": total,
+        "pozo_pct": int(LOTERIA_POZO_PCT * 100),
+        "admin_pct": int(LOTERIA_ADMIN_PCT * 100),
+        "proximo": proximo_sorteo(),
+        "sorteado": bool(fila and fila["sorteado"]),
+        "ganador": None,
+        "demo": True,
+    }
+    if fila and fila["sorteado"]:
+        estado["ganador"] = {"numero": fila["ganador_numero"], "wallet": fila["ganador_wallet"]}
+    return estado
+
+
+def loteria_comprar(numero, wallet):
+    numero = re.sub(r"\D", "", str(numero or ""))[:4]
+    if len(numero) != 4:
+        return "El número debe tener 4 dígitos (0000-9999)"
+    wallet = (wallet or "").strip()[:80]
+    if not wallet:
+        return "Conecta tu billetera primero"
+    fecha = hoy()
+    con = _bd()
+    fila = con.execute("SELECT sorteado FROM loterias WHERE fecha=?", (fecha,)).fetchone()
+    if fila and fila["sorteado"]:
+        con.close()
+        return "El sorteo de hoy ya se realizó. Vuelve mañana."
+    con.execute("INSERT INTO tickets (fecha, numero, wallet, creado) VALUES (?,?,?,?)",
+                (fecha, numero, wallet, int(time.time())))
+    con.commit()
+    con.close()
+    return None
+
+
+def loteria_sortear():
+    fecha = hoy()
+    con = _bd()
+    fila = con.execute("SELECT * FROM loterias WHERE fecha=?", (fecha,)).fetchone()
+    if fila and fila["sorteado"]:
+        con.close()
+        return {"numero": fila["ganador_numero"], "wallet": fila["ganador_wallet"]}, None
+    tickets = con.execute("SELECT numero, wallet FROM tickets WHERE fecha=?", (fecha,)).fetchall()
+    if not tickets:
+        con.close()
+        return None, "No hay tickets vendidos hoy."
+    ganador = random.choice(tickets)
+    con.execute(
+        "INSERT INTO loterias (fecha, sorteado, ganador_numero, ganador_wallet, sorteado_en) "
+        "VALUES (?,1,?,?,?) ON CONFLICT(fecha) DO UPDATE SET sorteado=1, "
+        "ganador_numero=excluded.ganador_numero, ganador_wallet=excluded.ganador_wallet, "
+        "sorteado_en=excluded.sorteado_en",
+        (fecha, ganador["numero"], ganador["wallet"], int(time.time())))
+    con.commit()
+    con.close()
+    return {"numero": ganador["numero"], "wallet": ganador["wallet"]}, None
+
+
+def loteria_tickets(wallet=None):
+    fecha = hoy()
+    con = _bd()
+    if wallet:
+        filas = con.execute(
+            "SELECT numero, wallet, creado FROM tickets WHERE fecha=? AND wallet=? ORDER BY creado DESC",
+            (fecha, wallet)).fetchall()
+    else:
+        filas = con.execute(
+            "SELECT numero, wallet, creado FROM tickets WHERE fecha=? ORDER BY creado DESC",
+            (fecha,)).fetchall()
+    con.close()
+    salida = []
+    for f in filas:
+        w = f["wallet"]
+        salida.append({"numero": f["numero"],
+                       "hora": time.strftime("%H:%M:%S", time.localtime(f["creado"])),
+                       "wallet": (w[:6] + "..." + w[-4:]) if len(w) > 10 else w})
+    return salida
+
+
+# --------------------------------------------------------------------------- #
 # Manejador HTTP
 # --------------------------------------------------------------------------- #
 class Manejador(BaseHTTPRequestHandler):
@@ -287,6 +410,14 @@ class Manejador(BaseHTTPRequestHandler):
             return self._responder(500, "Falta index.html")
         if ruta == "/api/banners":
             return self._json({"banners": json_banners(), "stats": self._stats()})
+        if ruta == "/api/loteria":
+            return self._json(loteria_estado())
+        if ruta == "/api/loteria/tickets":
+            consulta = parse_qs(urlparse(self.path).query)
+            wallet = (consulta.get("wallet") or [""])[0].strip()
+            if not wallet and not self._admin():
+                return self._json({"error": "no autorizado"}, 401)
+            return self._json({"tickets": loteria_tickets(wallet or None)})
         if ruta == "/api/enlaces":
             if not self._admin():
                 return self._json({"error": "no autorizado"}, 401)
@@ -316,6 +447,20 @@ class Manejador(BaseHTTPRequestHandler):
             return self._guardar_banner(datos)
         if ruta == "/api/admin/borrar":
             return self._borrar_banner(datos)
+        if ruta == "/api/loteria/comprar":
+            error = loteria_comprar(datos.get("numero"), datos.get("wallet"))
+            if error:
+                return self._json({"error": error}, 400)
+            return self._json(loteria_estado())
+        if ruta == "/api/loteria/sortear":
+            if not self._admin():
+                return self._json({"error": "no autorizado"}, 401)
+            ganador, error = loteria_sortear()
+            if error:
+                return self._json({"error": error}, 400)
+            estado = loteria_estado()
+            estado["ganador"] = ganador
+            return self._json(estado)
         return self._json({"error": "ruta no encontrada"}, 404)
 
     def do_OPTIONS(self):

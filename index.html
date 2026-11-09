@@ -51,9 +51,77 @@
         </div>
     </header>
 
+    <!-- AVISO: LOTERÍA PRÓXIMAMENTE -->
+    <div class="w-full bg-gradient-to-r from-brave-orange/20 via-purple-600/20 to-brave-orange/20 border-b border-brave-orange/30">
+        <div class="max-w-4xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-center">
+            <i class="fa-solid fa-dice text-brave-orange animate-pulse"></i>
+            <span class="text-xs sm:text-sm font-extrabold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-500 uppercase">Próximamente Lotería Cripto</span>
+            <i class="fa-solid fa-dice text-brave-orange animate-pulse"></i>
+        </div>
+    </div>
+
     <!-- MAIN CONTENT CONTAINER -->
     <main class="max-w-4xl mx-auto px-4 py-8 w-full flex-1">
         
+        <!-- MÓDULO DE LOTERÍA (DEMOSTRACIÓN - SIN DINERO REAL) -->
+        <section id="loteriaDemo" class="bg-gradient-to-br from-brave-card via-purple-950/40 to-brave-card border border-brave-orange/40 rounded-2xl p-6 shadow-2xl mb-8 relative overflow-hidden">
+            <div class="absolute -right-6 -top-6 bg-brave-orange/10 w-28 h-28 rounded-full blur-2xl"></div>
+
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-[10px] font-extrabold bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-2.5 py-1 rounded-full uppercase tracking-wider">🎰 Demostración — sin dinero real</span>
+                <span id="lotCountdown" class="text-xs text-gray-400 font-mono">--:--:--</span>
+            </div>
+
+            <h2 class="text-lg font-bold text-gray-100 mb-1"><i class="fa-solid fa-ticket text-brave-orange mr-2"></i>Lotería Cripto (próximamente)</h2>
+            <p class="text-xs text-gray-400 mb-4">Así funcionará la lotería. Puedes probarla ya, pero <b class="text-yellow-400">no se cobra ni se paga nada</b>: son cifras de demostración.</p>
+
+            <!-- Pozo acumulado -->
+            <div class="text-center my-4 bg-brave-dark/70 border border-brave-border rounded-xl p-4">
+                <p class="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Pozo acumulado (<span id="lotPozoPct">80</span>% de premios)</p>
+                <div class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-500 my-1">
+                    <span id="lotPozo">5.00</span> <span class="text-lg">BAT</span>
+                </div>
+                <p class="text-[10px] text-gray-500">Pozo base 5 BAT · <span id="lotAdminPct">20</span>% reservado para administración</p>
+            </div>
+
+            <!-- Estadísticas -->
+            <div class="grid grid-cols-2 gap-2 mb-4 text-center">
+                <div class="bg-brave-dark/50 border border-brave-border p-2.5 rounded-xl">
+                    <p class="text-[10px] text-gray-400">Tickets vendidos hoy</p>
+                    <p id="lotTickets" class="text-base font-bold text-white">0</p>
+                </div>
+                <div class="bg-brave-dark/50 border border-brave-border p-2.5 rounded-xl">
+                    <p class="text-[10px] text-gray-400">Precio del ticket</p>
+                    <p class="text-base font-bold text-brave-orange"><span id="lotPrecio">1.00</span> BAT</p>
+                </div>
+            </div>
+
+            <!-- Ganador de hoy (si ya se sorteó) -->
+            <div id="lotGanador" class="hidden mb-4 p-3 bg-emerald-500/10 border border-emerald-500/40 rounded-xl text-center">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">Ganador de hoy</p>
+                <p class="text-sm text-white font-mono" id="lotGanadorTexto">—</p>
+            </div>
+
+            <!-- Formulario de compra -->
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1 font-medium">Elige tu número de la suerte (4 dígitos):</label>
+                    <input type="text" id="lotNumero" inputmode="numeric" maxlength="4" placeholder="Ej: 7777" class="w-full bg-brave-dark border border-brave-border rounded-xl p-3 text-center text-lg font-bold tracking-widest text-brave-orange focus:outline-none focus:border-brave-orange">
+                </div>
+                <button onclick="comprarTicket()" class="w-full bg-gradient-to-r from-brave-orange to-amber-600 hover:opacity-90 text-white font-extrabold py-3 rounded-xl text-sm shadow-lg transition flex justify-center items-center gap-2">
+                    🎟️ Comprar ticket (demostración)
+                </button>
+            </div>
+
+            <!-- Mis tickets -->
+            <div class="mt-4 pt-3 border-t border-brave-border">
+                <p class="text-xs text-gray-400 mb-2 font-medium">Mis tickets para el sorteo de hoy:</p>
+                <div id="lotMisTickets" class="flex flex-wrap gap-1.5 text-xs">
+                    <span class="text-gray-600 text-[11px] italic">No has comprado tickets aún.</span>
+                </div>
+            </div>
+        </section>
+
         <!-- ACORTADOR DE ENLACES -->
         <section class="bg-brave-card border border-brave-border p-6 rounded-2xl shadow-2xl mb-8">
             <h2 class="text-lg font-bold mb-4 text-gray-200"><i class="fa-solid fa-link text-brave-orange mr-2"></i>Acortar un nuevo enlace</h2>
@@ -119,6 +187,21 @@
             <h3 class="text-sm font-semibold text-gray-300 mb-3">Banners Publicitarios Activos en el Sistema</h3>
             <div id="bannersList" class="space-y-3">
                 <!-- Se puebla dinámicamente mediante JS -->
+            </div>
+
+            <!-- Lotería (demo): registro de compradores y sorteo -->
+            <div class="mt-6 pt-4 border-t border-brave-border space-y-3">
+                <h3 class="text-sm font-semibold text-gray-300">Lotería (demostración) — registro de hoy</h3>
+                <div class="bg-brave-dark p-3 rounded-xl flex items-center justify-between">
+                    <span class="text-xs text-gray-400">Reservado para administración (20%):</span>
+                    <span id="lotAdminTotal" class="text-sm font-bold text-emerald-400">0.00 BAT</span>
+                </div>
+                <div id="adminTicketsRegistry" class="max-h-36 overflow-y-auto bg-brave-dark p-2 rounded-xl text-[11px] space-y-1 font-mono text-gray-400">
+                    <p class="text-gray-600 italic">Esperando primeras compras...</p>
+                </div>
+                <button onclick="sortearLoteria()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs shadow-lg transition">
+                    🎲 Realizar sorteo de hoy y elegir ganador
+                </button>
             </div>
         </section>
 
@@ -254,6 +337,7 @@
                 document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
                 toggleAdminModal();
                 renderAdminBanners();
+                cargarTicketsAdmin();
             } catch (err) {
                 alert('Acceso denegado: ' + err.message);
             }
@@ -379,14 +463,152 @@
             if (url) window.open(url, '_blank');
         }
 
-        // Simular Conexión de Brave Wallet
-        function connectWallet() {
-            document.getElementById('walletText').innerText = "0x71C...4B9 (Brave)";
-            alert("Brave Wallet conectada exitosamente.");
+        // Conexión con Brave Wallet / Web3 (real si hay billetera; si no, billetera demo)
+        let userAddress = null;
+        async function connectWallet() {
+            if (window.ethereum) {
+                try {
+                    const cuentas = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    userAddress = cuentas[0];
+                    document.getElementById('walletText').innerText =
+                        userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
+                    document.getElementById('walletBtn').classList.remove('bg-brave-orange');
+                    document.getElementById('walletBtn').classList.add('bg-emerald-600');
+                    cargarMisTickets();
+                    return;
+                } catch (e) {
+                    alert('No se pudo conectar la billetera.');
+                    return;
+                }
+            }
+            // Sin billetera Web3: se usa una billetera de demostración para poder probar
+            if (!userAddress) {
+                userAddress = 'demo-0x' + Math.random().toString(16).slice(2, 10);
+            }
+            document.getElementById('walletText').innerText = 'Billetera demo';
+            cargarMisTickets();
+        }
+
+        // ---------------- LOTERÍA (DEMOSTRACIÓN) ----------------
+        let lotEstado = null;
+
+        function pintarCuentaAtras() {
+            const el = document.getElementById('lotCountdown');
+            if (!el || !lotEstado) return;
+            let seg = Math.max(0, lotEstado.proximo - Math.floor(Date.now() / 1000));
+            const h = String(Math.floor(seg / 3600)).padStart(2, '0');
+            const m = String(Math.floor((seg % 3600) / 60)).padStart(2, '0');
+            const s = String(seg % 60).padStart(2, '0');
+            el.innerText = 'Próximo sorteo en ' + h + ':' + m + ':' + s;
+        }
+
+        function renderLoteria() {
+            if (!lotEstado) return;
+            document.getElementById('lotPozo').innerText = lotEstado.pozo.toFixed(2);
+            document.getElementById('lotPrecio').innerText = lotEstado.precio.toFixed(2);
+            document.getElementById('lotTickets').innerText = lotEstado.tickets;
+            document.getElementById('lotPozoPct').innerText = lotEstado.pozo_pct;
+            document.getElementById('lotAdminPct').innerText = lotEstado.admin_pct;
+            document.getElementById('lotAdminTotal').innerText = lotEstado.admin.toFixed(2) + ' BAT';
+            const g = document.getElementById('lotGanador');
+            if (lotEstado.ganador) {
+                g.classList.remove('hidden');
+                const w = lotEstado.ganador.wallet;
+                document.getElementById('lotGanadorTexto').innerText =
+                    '#' + lotEstado.ganador.numero + ' — ' + w.slice(0, 6) + '...' + w.slice(-4);
+            } else {
+                g.classList.add('hidden');
+            }
+            pintarCuentaAtras();
+        }
+
+        async function cargarLoteria() {
+            try {
+                lotEstado = await api(API + '/api/loteria');
+                renderLoteria();
+                if (isAdminLoggedIn) cargarTicketsAdmin();
+                if (userAddress) cargarMisTickets();
+            } catch (e) { /* sin servidor */ }
+        }
+
+        async function cargarMisTickets() {
+            const caja = document.getElementById('lotMisTickets');
+            if (!caja || !userAddress || !servidorActivo) return;
+            try {
+                const d = await api(API + '/api/loteria/tickets?wallet=' + encodeURIComponent(userAddress));
+                const mios = d.tickets || [];
+                if (!mios.length) {
+                    caja.innerHTML = '<span class="text-gray-600 text-[11px] italic">No has comprado tickets aún.</span>';
+                    return;
+                }
+                caja.innerHTML = mios.map(function (t) {
+                    return '<span class="bg-brave-orange/20 border border-brave-orange/40 text-orange-300 font-mono font-bold px-2 py-1 rounded-lg">#' + t.numero + '</span>';
+                }).join('');
+            } catch (e) { /* ignore */ }
+        }
+
+        async function cargarTicketsAdmin() {
+            const caja = document.getElementById('adminTicketsRegistry');
+            if (!caja) return;
+            try {
+                const d = await api(API + '/api/loteria/tickets');
+                const lista = d.tickets || [];
+                if (!lista.length) {
+                    caja.innerHTML = '<p class="text-gray-600 italic">Esperando primeras compras...</p>';
+                    return;
+                }
+                caja.innerHTML = lista.map(function (t) {
+                    return '<div class="border-b border-brave-border pb-1 flex justify-between gap-2"><span>' +
+                        t.wallet + '</span><span class="text-brave-orange font-bold">#' + t.numero +
+                        '</span><span class="text-gray-600">' + t.hora + '</span></div>';
+                }).join('');
+            } catch (e) { /* ignore */ }
+        }
+
+        async function comprarTicket() {
+            if (!servidorActivo) {
+                alert('Esta copia no está conectada al servidor.');
+                return;
+            }
+            if (!userAddress) { await connectWallet(); if (!userAddress) return; }
+            const num = (document.getElementById('lotNumero').value || '').replace(/\D/g, '');
+            if (num.length !== 4) {
+                alert('Escribe un número de 4 dígitos (0000-9999).');
+                return;
+            }
+            try {
+                lotEstado = await api(API + '/api/loteria/comprar', {
+                    method: 'POST',
+                    body: JSON.stringify({ numero: num, wallet: userAddress })
+                });
+                renderLoteria();
+                cargarMisTickets();
+                document.getElementById('lotNumero').value = '';
+                alert('¡Ticket #' + num + ' registrado!\n\n(Demostración: no se cobró ningún token.)');
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function sortearLoteria() {
+            try {
+                lotEstado = await api(API + '/api/loteria/sortear', { method: 'POST', body: '{}' });
+                renderLoteria();
+                cargarTicketsAdmin();
+                if (lotEstado.ganador) {
+                    alert('🎉 Ganador de hoy: #' + lotEstado.ganador.numero + ' (' +
+                        lotEstado.ganador.wallet + ')\n\nRecordatorio: es una demostración; todavía no se paga ningún premio.');
+                }
+            } catch (e) {
+                alert(e.message);
+            }
         }
 
         // Arranque: cargar banners y, si había sesión de admin, reabrir el panel
         cargarBanners().then(function () {
+            cargarLoteria();
+            setInterval(pintarCuentaAtras, 1000);
+            setInterval(function () { if (servidorActivo) cargarLoteria(); }, 15000);
             if (claveAdmin) {
                 api(API + '/api/enlaces').then(function () {
                     isAdminLoggedIn = true;
@@ -394,6 +616,7 @@
                     document.getElementById('adminBtnText').innerText = 'Admin Activo';
                     document.getElementById('adminAuthBtn').classList.add('bg-purple-600', 'text-white');
                     renderAdminBanners();
+                    cargarTicketsAdmin();
                 }).catch(function () {
                     claveAdmin = '';
                     localStorage.removeItem('taktak_admin_clave');
